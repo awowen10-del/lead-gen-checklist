@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f5f2" />
+    <title>Bodysculpt · Lead-Gen Hour</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✅</text></svg>" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <div class="hero__bar">
+          <div>
+            <h1 class="hero__title">Lead-Gen Hour</h1>
+            <p class="hero__subtitle">Daily checklist · 9–10am</p>
+          </div>
+          <p class="hero__date" id="todayLabel"></p>
+        </div>
+        <div class="stats" id="stats" hidden>
+          <div class="stat">
+            <span class="stat__value" id="statRun">–</span>
+            <span class="stat__label">🔥 current run</span>
+          </div>
+          <div class="stat">
+            <span class="stat__value" id="statMonth">–</span>
+            <span class="stat__label" id="statMonthLabel">✅ this month</span>
+          </div>
+          <div class="stat stat--week">
+            <div class="week" id="weekDots" aria-label="Last 7 days"></div>
+            <span class="stat__label">last 7 days</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="banner banner--error" id="errorBanner" hidden></div>
+
+      <main>
+        <section class="card" aria-labelledby="checklistTitle">
+          <h2 class="card__title" id="checklistTitle">Today's five</h2>
+          <ul class="tasks" id="taskList"></ul>
+        </section>
+
+        <section class="card" aria-labelledby="notesTitle">
+          <h2 class="card__title" id="notesTitle">Notes</h2>
+          <label class="field__label" for="generalNotes">What happened today? Wins, numbers, ideas…</label>
+          <textarea id="generalNotes" class="field__input" rows="4" placeholder="e.g. 3 new leads from the reel, booked 2 consults…"></textarea>
+          <div class="notes__actions">
+            <button class="btn btn--primary" id="saveNotesBtn" type="button">Save notes</button>
+            <span class="notes__status" id="notesStatus" role="status"></span>
+          </div>
+        </section>
+
+        <section class="card card--submit" aria-labelledby="submitTitle">
+          <div id="submitPending">
+            <h2 class="card__title" id="submitTitle">Wrap up</h2>
+            <p class="submit__progress" id="progressLabel">0 of 5 done</p>
+            <div class="progressbar" aria-hidden="true"><div class="progressbar__fill" id="progressFill"></div></div>
+            <button class="btn btn--primary btn--big" id="submitBtn" type="button">Submit today ✓</button>
+            <p class="submit__hint">Locks in today, feeds your streak, and starts fresh tomorrow.</p>
+          </div>
+          <div id="submitDone" hidden>
+            <p class="done__emoji" aria-hidden="true">🎉</p>
+            <h2 class="card__title">Done for today</h2>
+            <p class="done__text" id="doneText">Nice work — today is logged. See you tomorrow at 9am.</p>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="logTitle">
+          <div class="log__head">
+            <h2 class="card__title" id="logTitle">Past notes</h2>
+            <button class="btn btn--ghost" id="toggleLogBtn" type="button" aria-expanded="false">Show</button>
+          </div>
+          <div id="logPanel" hidden>
+            <p class="log__empty" id="logEmpty" hidden>No saved notes yet — they'll show up here.</p>
+            <ul class="log" id="logList"></ul>
+          </div>
+        </section>
+      </main>
+
+      <footer class="foot">Bodysculpt · consistency beats intensity 💪</footer>
+    </div>
+    <script src="/app.js"></script>
+  </body>
+</html>

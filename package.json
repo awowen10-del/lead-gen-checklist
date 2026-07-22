@@ -1,0 +1,13 @@
+{
+  "name": "lead-gen-checklist",
+  "version": "1.0.0",
+  "description": "Daily lead-generation checklist for Bodysculpt — 9-10am lead-gen hour",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "netlify dev"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

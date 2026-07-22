@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# Netlify local state
+.netlify/
+
+# Environment / secrets
+.env
+.env.*
+*.local
+secrets*
+
+# OS
+.DS_Store
