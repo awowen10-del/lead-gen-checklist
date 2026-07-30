@@ -10,7 +10,7 @@ const TASKS = [
   { id: "texts", label: "Texts + follow-ups", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" } },
   { id: "clients", label: "Check in with clients", notes: true },
   { id: "leads", label: "Reach out to old leads" },
-  { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Onboarding ↗" } },
+  { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
 ];
 
 /* ---------------- State ---------------- */
