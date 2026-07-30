@@ -3,7 +3,10 @@ import { getStore } from "@netlify/blobs";
 export const config = { path: "/api/*" };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TASK_IDS = ["ads", "content", "texts", "clients", "leads"];
+// Allowlist for POST /api/state — must stay in sync with TASKS in public/app.js.
+// Additive only: ids are stable, and days saved before an id existed simply
+// read back as unticked.
+const TASK_IDS = ["ads", "content", "texts", "clients", "leads", "onboarding"];
 const MAX_LOG_ENTRIES = 1000;
 const MAX_NOTE_LEN = 5000;
 

@@ -1,12 +1,16 @@
 "use strict";
 
 /* ---------------- Config ---------------- */
+/* Completion is keyed by these stable ids, never by position — reordering is
+   safe, but an id here must also exist in TASK_IDS in netlify/functions/api.mjs
+   or the server will silently drop its ticks. */
 const TASKS = [
   { id: "ads", label: "Launch / tweak new ads", link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" } },
   { id: "content", label: "Post content / stories" },
   { id: "texts", label: "Texts + follow-ups", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" } },
   { id: "clients", label: "Check in with clients", notes: true },
   { id: "leads", label: "Reach out to old leads" },
+  { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Onboarding ↗" } },
 ];
 
 /* ---------------- State ---------------- */
@@ -22,6 +26,7 @@ let saveTimer = null;
 let dirty = false; // true only after a real user interaction — a stale tab must never autosave
 let lastSavedNotes = null; // snapshot of last notes saved to the log
 let logLoaded = false;
+let notesOpen = false; // whether the collapsible task note panel is expanded
 
 /* ---------------- Date helpers ---------------- */
 function todayStr(offset = 0) {
@@ -118,6 +123,10 @@ function renderTasks() {
     li.className = "task" + (state.checked[task.id] ? " task--done" : "");
     li.dataset.id = task.id;
 
+    // head holds everything that must stay one uniform row height
+    const head = document.createElement("div");
+    head.className = "task__head";
+
     const row = document.createElement("label");
     row.className = "task__row";
 
@@ -142,6 +151,7 @@ function renderTasks() {
     label.textContent = task.label;
 
     row.append(input, box, label);
+    head.append(row);
 
     if (task.link) {
       const a = document.createElement("a");
@@ -150,16 +160,19 @@ function renderTasks() {
       a.target = "_blank";
       a.rel = "noopener";
       a.textContent = task.link.text;
-      // don't toggle the checkbox when tapping the link
-      a.addEventListener("click", (e) => e.stopPropagation());
-      row.append(a);
+      head.append(a);
     }
 
-    li.append(row);
+    li.append(head);
 
     if (task.notes) {
+      const panelId = `taskNotes-${task.id}`;
+
       const wrap = document.createElement("div");
       wrap.className = "task__notes";
+      wrap.id = panelId;
+      wrap.hidden = !notesOpen;
+
       const ta = document.createElement("textarea");
       ta.className = "field__input field__input--small";
       ta.id = "clientNotes";
@@ -167,13 +180,32 @@ function renderTasks() {
       ta.placeholder = "Client check-in notes…";
       ta.value = state.clientNotes;
       ta.disabled = state.submitted;
+      wrap.append(ta);
+
+      // small affordance in the row; keeps every row the same height
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className =
+        "task__note-btn" + (state.clientNotes.trim() ? " task__note-btn--filled" : "");
+      toggle.textContent = "🗒";
+      toggle.title = "Check-in notes";
+      toggle.setAttribute("aria-label", "Check-in notes");
+      toggle.setAttribute("aria-expanded", String(notesOpen));
+      toggle.setAttribute("aria-controls", panelId);
+
       ta.addEventListener("input", () => {
         state.clientNotes = ta.value;
+        toggle.classList.toggle("task__note-btn--filled", ta.value.trim() !== "");
         scheduleSave();
       });
-      // typing in the textarea shouldn't toggle the checkbox
-      ta.addEventListener("click", (e) => e.stopPropagation());
-      wrap.append(ta);
+      toggle.addEventListener("click", () => {
+        notesOpen = !notesOpen;
+        wrap.hidden = !notesOpen;
+        toggle.setAttribute("aria-expanded", String(notesOpen));
+        if (notesOpen) ta.focus();
+      });
+
+      head.append(toggle);
       li.append(wrap);
     }
 
@@ -183,6 +215,7 @@ function renderTasks() {
 
 function renderProgress() {
   const done = TASKS.filter((t) => state.checked[t.id]).length;
+  document.getElementById("taskCount").textContent = `${done}/${TASKS.length} done`;
   document.getElementById("progressLabel").textContent = `${done} of ${TASKS.length} done`;
   const fill = document.getElementById("progressFill");
   fill.style.width = `${(done / TASKS.length) * 100}%`;
@@ -374,6 +407,7 @@ document.addEventListener("visibilitychange", () => {
       generalNotes: "",
       clientNotes: "",
     };
+    notesOpen = false;
     load();
   } else if (!dirty && !saveTimer) {
     load();

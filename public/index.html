@@ -1,4 +1,5 @@
 <!doctype html>
+<!-- build: 2026-07-30 · density pass + collapsible task note + onboarding task -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -38,14 +39,16 @@
 
       <main>
         <section class="card" aria-labelledby="checklistTitle">
-          <h2 class="card__title" id="checklistTitle">Today's five</h2>
+          <h2 class="card__title" id="checklistTitle">
+            Today's list<span class="card__count" id="taskCount"></span>
+          </h2>
           <ul class="tasks" id="taskList"></ul>
         </section>
 
         <section class="card" aria-labelledby="notesTitle">
           <h2 class="card__title" id="notesTitle">Notes</h2>
           <label class="field__label" for="generalNotes">What happened today? Wins, numbers, ideas…</label>
-          <textarea id="generalNotes" class="field__input" rows="4" placeholder="e.g. 3 new leads from the reel, booked 2 consults…"></textarea>
+          <textarea id="generalNotes" class="field__input field__input--notes" rows="2" placeholder="e.g. 3 new leads from the reel, booked 2 consults…"></textarea>
           <div class="notes__actions">
             <button class="btn btn--primary" id="saveNotesBtn" type="button">Save notes</button>
             <span class="notes__status" id="notesStatus" role="status"></span>
@@ -55,7 +58,7 @@
         <section class="card card--submit" aria-labelledby="submitTitle">
           <div id="submitPending">
             <h2 class="card__title" id="submitTitle">Wrap up</h2>
-            <p class="submit__progress" id="progressLabel">0 of 5 done</p>
+            <p class="submit__progress" id="progressLabel">0 of 6 done</p>
             <div class="progressbar" aria-hidden="true"><div class="progressbar__fill" id="progressFill"></div></div>
             <button class="btn btn--primary btn--big" id="submitBtn" type="button">Submit today ✓</button>
             <p class="submit__hint">Locks in today, feeds your streak, and starts fresh tomorrow.</p>
