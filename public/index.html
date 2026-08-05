@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- build: 2026-07-30b · density pass + collapsible task note + onboarding task -->
+<!-- build: 2026-08-05a · persistence fix (strong consistency, partial writes, exit flush) -->
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -17,7 +17,10 @@
             <h1 class="hero__title">Lead-Gen Hour</h1>
             <p class="hero__subtitle">Daily checklist · 9–10am</p>
           </div>
-          <p class="hero__date" id="todayLabel"></p>
+          <div class="hero__meta">
+            <p class="hero__date" id="todayLabel"></p>
+            <span class="savestate" id="saveState" role="status" aria-live="polite" hidden></span>
+          </div>
         </div>
         <div class="stats" id="stats" hidden>
           <div class="stat">
@@ -36,6 +39,10 @@
       </header>
 
       <div class="banner banner--error" id="errorBanner" hidden></div>
+      <div class="banner banner--block" id="loadBlocker" role="alert" hidden>
+        <span id="loadBlockerText">Couldn't load today's data — don't tick yet.</span>
+        <button class="btn btn--ghost" id="retryLoadBtn" type="button">Retry</button>
+      </div>
 
       <main>
         <section class="card" aria-labelledby="checklistTitle">
@@ -48,9 +55,9 @@
         <section class="card" aria-labelledby="notesTitle">
           <h2 class="card__title" id="notesTitle">Notes</h2>
           <label class="field__label" for="generalNotes">What happened today? Wins, numbers, ideas…</label>
-          <textarea id="generalNotes" class="field__input field__input--notes" rows="2" placeholder="e.g. 3 new leads from the reel, booked 2 consults…"></textarea>
+          <textarea id="generalNotes" class="field__input field__input--notes" rows="2" placeholder="e.g. 3 new leads from the reel, booked 2 consults…" disabled></textarea>
           <div class="notes__actions">
-            <button class="btn btn--primary" id="saveNotesBtn" type="button">Save notes</button>
+            <button class="btn btn--primary" id="saveNotesBtn" type="button" disabled>Save notes</button>
             <span class="notes__status" id="notesStatus" role="status"></span>
           </div>
         </section>
@@ -60,7 +67,7 @@
             <h2 class="card__title" id="submitTitle">Wrap up</h2>
             <p class="submit__progress" id="progressLabel">0 of 6 done</p>
             <div class="progressbar" aria-hidden="true"><div class="progressbar__fill" id="progressFill"></div></div>
-            <button class="btn btn--primary btn--big" id="submitBtn" type="button">Submit today ✓</button>
+            <button class="btn btn--primary btn--big" id="submitBtn" type="button" disabled>Submit today ✓</button>
             <p class="submit__hint">Locks in today, feeds your streak, and starts fresh tomorrow.</p>
           </div>
           <div id="submitDone" hidden>

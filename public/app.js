@@ -13,22 +13,45 @@ const TASKS = [
   { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
 ];
 
-/* ---------------- State ---------------- */
-let state = {
-  checked: Object.fromEntries(TASKS.map((t) => [t.id, false])),
+const NOTES_DEBOUNCE_MS = 600;
+
+const emptyChecked = () => Object.fromEntries(TASKS.map((t) => [t.id, false]));
+const emptyState = () => ({
+  checked: emptyChecked(),
   submitted: false,
   generalNotes: "",
   clientNotes: "",
-};
+});
+
+/* ---------------- State ---------------- */
+let state = emptyState();
 let history = {};
 let currentDate = todayStr();
+
+/* Persistence bookkeeping.
+   `loaded` is the gate: it is true only after a GET has actually succeeded.
+   Nothing may be written to the server while it is false, because until the
+   server's version of today has arrived we have nothing but defaults, and
+   writing defaults is how a day's notes and ticks got erased. */
+let loaded = false;
+/* `pending` holds only the fields the user has actually changed since the last
+   successful write — never a whole day record. It is the payload source for
+   every save, which is what makes a default/empty write structurally
+   impossible rather than merely guarded against. */
+let pending = { checked: {} };
+let inFlight = false;
 let saveTimer = null;
-let dirty = false; // true only after a real user interaction — a stale tab must never autosave
+let savedFlashTimer = null;
+
 let lastSavedNotes = null; // snapshot of last notes saved to the log
 let logLoaded = false;
 let notesOpen = false; // whether the collapsible task note panel is expanded
 
-/* ---------------- Date helpers ---------------- */
+/* ---------------- Date helpers ----------------
+   todayStr() is the ONE place a date key is ever generated, and it is purely
+   local-time (getFullYear/getMonth/getDate — never toISOString, which would
+   shift the key across UTC midnight). currentDate is set from it and from
+   nothing else. */
 function todayStr(offset = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
@@ -85,36 +108,159 @@ function clearError() {
   document.getElementById("errorBanner").hidden = true;
 }
 
-/* ---------------- Autosave (debounced) ---------------- */
-function scheduleSave() {
-  dirty = true;
+/* Load failure is never silent: the checklist blocks input and says so, with a
+   retry. Swallowing this is what let a failed load turn into a wiped record. */
+function showLoadBlocker(msg) {
+  const el = document.getElementById("loadBlocker");
+  document.getElementById("loadBlockerText").textContent =
+    `Couldn't load today's data — don't tick yet. (${msg})`;
+  el.hidden = false;
+}
+function hideLoadBlocker() {
+  document.getElementById("loadBlocker").hidden = true;
+}
+
+/* ---------------- Save indicator ---------------- */
+function setSaveState(kind) {
+  const el = document.getElementById("saveState");
+  clearTimeout(savedFlashTimer);
+  el.classList.remove("savestate--saved", "savestate--error");
+  if (kind === "saving") {
+    el.textContent = "Saving…";
+    el.hidden = false;
+  } else if (kind === "saved") {
+    el.textContent = "Saved ✓";
+    el.classList.add("savestate--saved");
+    el.hidden = false;
+    savedFlashTimer = setTimeout(() => { el.hidden = true; }, 2000);
+  } else if (kind === "error") {
+    el.textContent = "Not saved";
+    el.classList.add("savestate--error");
+    el.hidden = false;
+  } else {
+    el.textContent = "";
+    el.hidden = true;
+  }
+}
+
+/* ---------------- Autosave ----------------
+   Ticks save immediately — they are single, deliberate actions and there is
+   nothing to coalesce. Only free-text typing is debounced. */
+function queueChecked(id, value) {
+  pending.checked[id] = value;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(pushState, 600);
+  saveTimer = null;
+  pushState();
+}
+
+function queueNote(field, value) {
+  pending[field] = value;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(pushState, NOTES_DEBOUNCE_MS);
+}
+
+function hasPending() {
+  return (
+    Object.keys(pending.checked).length > 0 ||
+    "generalNotes" in pending ||
+    "clientNotes" in pending
+  );
+}
+
+function takePending() {
+  if (!hasPending()) return null;
+  const payload = { date: currentDate };
+  if (Object.keys(pending.checked).length) payload.checked = { ...pending.checked };
+  if ("generalNotes" in pending) payload.generalNotes = pending.generalNotes;
+  if ("clientNotes" in pending) payload.clientNotes = pending.clientNotes;
+  pending = { checked: {} };
+  return payload;
+}
+
+/* Put a failed payload back so nothing is lost, without clobbering anything the
+   user has changed since — newer edits always win. */
+function restorePending(payload) {
+  if (payload.checked) {
+    for (const [id, v] of Object.entries(payload.checked)) {
+      if (!(id in pending.checked)) pending.checked[id] = v;
+    }
+  }
+  if ("generalNotes" in payload && !("generalNotes" in pending)) pending.generalNotes = payload.generalNotes;
+  if ("clientNotes" in payload && !("clientNotes" in pending)) pending.clientNotes = payload.clientNotes;
 }
 
 async function pushState() {
   clearTimeout(saveTimer);
   saveTimer = null;
-  if (!dirty) return; // never write state the user hasn't actually changed
+  if (!loaded) return; // load must resolve before any write is permitted
+  if (inFlight) return; // a save is running; it re-checks pending when it finishes
+  const payload = takePending();
+  if (!payload) return;
+
+  inFlight = true;
+  setSaveState("saving");
+  let ok = false;
   try {
     await api("state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        date: currentDate,
-        checked: state.checked,
-        generalNotes: state.generalNotes,
-        clientNotes: state.clientNotes,
-      }),
+      body: JSON.stringify(payload),
     });
-    dirty = false;
+    ok = true;
+    setSaveState("saved");
     clearError();
   } catch (e) {
+    restorePending(payload);
+    setSaveState("error");
     showError(`Couldn't save: ${e.message}`);
+  } finally {
+    inFlight = false;
   }
+  // Only chain on success — on failure we stop and wait for the next user
+  // action or exit flush, rather than hammering a dead endpoint in a loop.
+  if (ok && hasPending()) await pushState();
+}
+
+/* ---------------- Exit flush ----------------
+   A debounced or in-flight save does not survive the page being hidden: iOS
+   freezes timers the moment the tab goes to the background and a plain fetch
+   is cancelled on unload. sendBeacon is handed to the browser and sent
+   regardless of what happens to the page.
+
+   Known limit, accepted: sendBeacon returns only "queued / not queued" and
+   exposes no response, so the indicator cannot confirm the write landed. It
+   shows "Saving…" and the next load reconciles the truth. `pending` is
+   deliberately NOT cleared here — the write is an idempotent merge, so if the
+   page survives, saving it again is harmless and covers a beacon that failed. */
+function flushOnExit() {
+  if (!loaded || !hasPending()) return;
+  const payload = { date: currentDate };
+  if (Object.keys(pending.checked).length) payload.checked = { ...pending.checked };
+  if ("generalNotes" in pending) payload.generalNotes = pending.generalNotes;
+  if ("clientNotes" in pending) payload.clientNotes = pending.clientNotes;
+
+  const body = JSON.stringify(payload);
+  let sent = false;
+  if (navigator.sendBeacon) {
+    // sendBeacon cannot set headers, so the content type rides on the Blob.
+    sent = navigator.sendBeacon("/api/state", new Blob([body], { type: "application/json" }));
+  }
+  if (!sent) {
+    fetch("/api/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      keepalive: true,
+    }).catch(() => {});
+  }
+  setSaveState("saving");
 }
 
 /* ---------------- Rendering ---------------- */
+function inputsDisabled() {
+  return state.submitted || !loaded;
+}
+
 function renderTasks() {
   const list = document.getElementById("taskList");
   list.innerHTML = "";
@@ -133,12 +279,12 @@ function renderTasks() {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.checked = !!state.checked[task.id];
-    input.disabled = state.submitted;
+    input.disabled = inputsDisabled();
     input.addEventListener("change", () => {
       state.checked[task.id] = input.checked;
       li.classList.toggle("task--done", input.checked);
       renderProgress();
-      scheduleSave();
+      queueChecked(task.id, input.checked);
     });
 
     const box = document.createElement("span");
@@ -179,7 +325,7 @@ function renderTasks() {
       ta.rows = 2;
       ta.placeholder = "Client check-in notes…";
       ta.value = state.clientNotes;
-      ta.disabled = state.submitted;
+      ta.disabled = inputsDisabled();
       wrap.append(ta);
 
       // small affordance in the row; keeps every row the same height
@@ -196,7 +342,7 @@ function renderTasks() {
       ta.addEventListener("input", () => {
         state.clientNotes = ta.value;
         toggle.classList.toggle("task__note-btn--filled", ta.value.trim() !== "");
-        scheduleSave();
+        queueNote("clientNotes", ta.value);
       });
       toggle.addEventListener("click", () => {
         notesOpen = !notesOpen;
@@ -227,7 +373,11 @@ function renderStats() {
   const run = computeRun();
   document.getElementById("statRun").textContent = run === 1 ? "1 day" : `${run} days`;
 
-  const monthName = new Date().toLocaleDateString("en-GB", { month: "long" });
+  // Month name comes from currentDate, not from a fresh Date() — otherwise the
+  // count (which is keyed off currentDate) and its label disagree across a
+  // month boundary.
+  const [y, m] = currentDate.split("-").map(Number);
+  const monthName = new Date(y, m - 1, 1).toLocaleDateString("en-GB", { month: "long" });
   document.getElementById("statMonth").textContent = String(computeMonth());
   document.getElementById("statMonthLabel").textContent = `✅ days in ${monthName}`;
 
@@ -254,10 +404,12 @@ function renderSubmitState() {
         ? `Nice work — that's a ${run}-day run. See you tomorrow at 9am.`
         : "Nice work — today is logged. See you tomorrow at 9am.";
   }
-  document.getElementById("generalNotes").disabled = state.submitted;
+  document.getElementById("generalNotes").disabled = inputsDisabled();
+  document.getElementById("saveNotesBtn").disabled = inputsDisabled();
+  document.getElementById("submitBtn").disabled = !loaded;
   const clientTa = document.getElementById("clientNotes");
-  if (clientTa) clientTa.disabled = state.submitted;
-  document.querySelectorAll("#taskList input").forEach((el) => (el.disabled = state.submitted));
+  if (clientTa) clientTa.disabled = inputsDisabled();
+  document.querySelectorAll("#taskList input").forEach((el) => (el.disabled = inputsDisabled()));
 }
 
 function renderAll() {
@@ -385,42 +537,54 @@ async function load() {
   currentDate = todayStr();
   try {
     const data = await api(`state?date=${currentDate}`);
-    state = { ...state, ...data.day, checked: { ...state.checked, ...data.day.checked } };
+    state = { ...state, ...data.day, checked: { ...emptyChecked(), ...data.day.checked } };
     history = data.history || {};
+    loaded = true;
+    hideLoadBlocker();
     clearError();
   } catch (e) {
-    showError(`Can't reach storage — changes won't be saved. (${e.message})`);
+    // Leave `state` alone and keep the gate shut: with loaded === false nothing
+    // can be written, so a failed load cannot turn into an overwritten record.
+    loaded = false;
+    showLoadBlocker(e.message);
   }
-  dirty = false;
   lastSavedNotes = null;
   renderAll();
 }
 
-// On re-focus: if the calendar day rolled over, start fresh; otherwise re-sync
-// from the server (picks up changes made on another device, avoids stale state)
+// On re-focus: if the calendar day rolled over, start fresh; if there are
+// unsaved edits, push them rather than reloading over the top of them;
+// otherwise re-sync from the server (picks up another device, avoids stale
+// state). Reloading while edits are pending would discard them.
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState !== "visible") return;
+  if (document.visibilityState !== "visible") {
+    flushOnExit();
+    return;
+  }
   if (todayStr() !== currentDate) {
-    state = {
-      checked: Object.fromEntries(TASKS.map((t) => [t.id, false])),
-      submitted: false,
-      generalNotes: "",
-      clientNotes: "",
-    };
+    state = emptyState();
+    pending = { checked: {} };
     notesOpen = false;
     load();
-  } else if (!dirty && !saveTimer) {
+  } else if (hasPending()) {
+    pushState();
+  } else if (!inFlight) {
     load();
   }
 });
 
+// pagehide covers the cases visibilitychange does not: tab close, back/forward
+// navigation, and iOS killing the page outright.
+window.addEventListener("pagehide", flushOnExit);
+
 /* ---------------- Wire up ---------------- */
 document.getElementById("generalNotes").addEventListener("input", (e) => {
   state.generalNotes = e.target.value;
-  scheduleSave();
+  queueNote("generalNotes", e.target.value);
 });
 document.getElementById("saveNotesBtn").addEventListener("click", () => saveNotes());
 document.getElementById("submitBtn").addEventListener("click", submitDay);
+document.getElementById("retryLoadBtn").addEventListener("click", load);
 document.getElementById("toggleLogBtn").addEventListener("click", async (e) => {
   const panel = document.getElementById("logPanel");
   const open = panel.hidden;

@@ -1,5 +1,14 @@
 import { getStore } from "@netlify/blobs";
 
+/* TODO — SECURITY, deliberately out of scope for the persistence fix.
+   Every route below is unauthenticated. There is no session, no origin check,
+   no rate limit and no CORS restriction, so anyone who knows the site URL can
+   read the whole notes log, overwrite any day's ticks and notes, and submit
+   days to inflate the streak. That was true before this change and is
+   unchanged by it. Likely fix: a shared secret in a Netlify env var checked on
+   every request (cheap, single-operator), or Netlify Identity if this ever
+   needs real accounts. Pick this up after the theme pass. */
+
 export const config = { path: "/api/*" };
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -32,7 +41,19 @@ export default async (req) => {
   const route = url.pathname.replace(/^\/api\/?/, "");
   let store;
   try {
-    store = getStore("leadgen");
+    /* consistency: "strong" is load-bearing, not a nicety. Netlify Blobs
+       defaults to "eventual", which serves reads from a cached edge that can
+       return a pre-write version of a key for a short window after a write.
+       That was the root cause of ticks appearing to vanish: the tick saved
+       fine, then the next GET (or the read half of the read-modify-write
+       below) returned the stale record and clobbered it. Strong reads go to
+       the uncached edge instead. Do not drop back to eventual in this file.
+
+       MUST be the object form. getStore() takes exactly ONE argument, so
+       getStore("leadgen", { consistency: "strong" }) silently discards the
+       options and leaves you on eventual consistency — no error, no warning,
+       and reads that look fine locally but are stale in production. */
+    store = getStore({ name: "leadgen", consistency: "strong" });
   } catch (e) {
     return err(500, "Storage unavailable — is this site linked on Netlify? " + e.message);
   }
@@ -47,7 +68,19 @@ export default async (req) => {
       return json({ day, history });
     }
 
-    // POST /api/state — upsert today's ticks / notes (autosave)
+    // POST /api/state — merge a PARTIAL patch into today's record.
+    //
+    // The client sends only the fields it actually changed (one tick → one id),
+    // never a whole day record, so a default/empty payload cannot exist to
+    // overwrite notes or other ticks. Every field here is opt-in: absent means
+    // "leave alone", and that contract is what makes the partial patch safe.
+    //
+    // This is a read-modify-write and is therefore not atomic — two writes
+    // landing together can interleave and one can be lost. The client
+    // serialises its own writes, which is sufficient for a single operator.
+    // If this ever goes multi-user, Netlify Blobs supports conditional writes
+    // (store.set with onlyIfMatch/onlyIfNew plus the etag from store.getWithMetadata)
+    // and that is the place to add them.
     if (req.method === "POST" && route === "state") {
       const body = await req.json();
       if (!DATE_RE.test(body.date || "")) return err(400, "Invalid or missing date");

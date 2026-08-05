@@ -76,6 +76,12 @@ body {
   color: var(--ink-soft);
   font-size: 0.85rem;
 }
+.hero__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
 .hero__date {
   margin: 3px 0 0;
   color: var(--ink-faint);
@@ -83,6 +89,17 @@ body {
   font-weight: 400;
   white-space: nowrap;
 }
+
+/* save indicator — sits under the date, never reflows the header */
+.savestate {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.savestate--saved { color: var(--win); }
+.savestate--error { color: var(--error-ink); }
 
 .stats {
   display: flex;
@@ -140,6 +157,19 @@ body {
   border-left: 6px solid var(--error-border);
   color: var(--error-ink);
   font-weight: 500;
+}
+/* blocking load failure — must read as louder than the transient error banner */
+.banner--block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-left: 6px solid var(--error-ink);
+  color: var(--error-ink);
+  font-weight: 600;
 }
 
 /* ---------- Cards ---------- */
@@ -432,5 +462,10 @@ body {
   .task__head { padding-right: 7px; }
   .task__row { padding-left: 9px; }
   .task__notes { padding-left: 9px; padding-right: 9px; }
-  .hero__date { width: 100%; }
+  .hero__meta {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
 }
