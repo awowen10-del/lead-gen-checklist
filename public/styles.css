@@ -1,22 +1,90 @@
-/* Theme tokens matched to bodysculpt-ad-intelligence.netlify.app */
-:root {
-  --bg: #f6f5f2;
-  --surface: #ffffff;
-  --border: #e8e7e2;
-  --ink: #0f1b2d;
-  --ink-soft: #52617a;
-  --ink-faint: #8794a6;
-  --accent: #e8732a;
-  --accent-ink: #b4571b;
-  --win: #2f7d5a;
-  --win-bg: #ebf3ee;
-  --error-bg: #f7e8e4;
-  --error-border: #e2b8ab;
-  --error-ink: #9a3b28;
-  --shadow: 0 1px 2px rgba(15, 27, 45, 0.03), 0 1px 3px rgba(15, 27, 45, 0.04);
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+/* ===================== THEME TOKENS =====================
+   Copied VERBATIM from bodysculptdashboard.netlify.app (bodysculpt-FULL-SITE,
+   index.html) so the two sites share one palette under one set of names. The
+   dashboard keeps its tokens inline in every page and has no stylesheet, so
+   there is no shared file to import — keeping the block byte-comparable is the
+   next best thing: to re-sync, diff this block against the dashboard's.
 
-  /* Spacing scale — tighten the whole page from here */
+   Two themes, one set of names. ":root,:root[data-theme='dark']" is the
+   original dark navy; ":root[data-theme='light']" is the neutral light theme
+   and is the default (see the boot script at the top of index.html).
+
+   The names are historical and do NOT describe the light values: in light,
+   --orange is a muted SLATE-BLUE and --navy is a soft light grey. The dashboard
+   kept the dark-theme names when it re-mapped light, so we keep them too —
+   renaming here would break parity with the site we are matching. */
+:root{
+  /* metrics — not themed */
+  --radius:16px;
+}
+:root,:root[data-theme="dark"]{
+  color-scheme:dark;
+  /* surfaces */
+  --navy:#0f1b2d; --navy-2:#16273f; --card:#1b2c45; --card-2:#203552;
+  --line:#2c405e; --line-rgb:44,64,94;
+  /* ink */
+  --ink:#eaf0f8; --ink-dim:#9fb1c7; --ink-faint:#6b7f99; --ink-strong:#fff;
+  --ink-dim-rgb:159,177,199; --ink-faint-rgb:107,127,153;
+  --on-accent:#fff;              /* text sitting ON a solid accent fill */
+  /* accents */
+  --orange:#e8732a; --orange-soft:#f0935a; --orange-rgb:232,115,42;
+  --green:#3fbf7f; --green-2:#43c088; --green-rgb:63,191,127; --green2-rgb:67,192,136;
+  --amber:#e8a93a; --amber-2:#f0b73a; --amber-rgb:232,169,58; --amber2-rgb:240,183,58;
+  --red:#e25555; --red-2:#e0574f; --red-rgb:226,85,85; --red2-rgb:214,77,77;
+  --teal:#4fa3b8; --teal-soft:#7fc4d6; --teal-bright:#a9dbe8; --teal-rgb:79,163,184;
+  --blue:#7fa3d4; --blue-soft:#8fb4e8; --blue-rgb:108,150,214;
+  --info:#6aa3e8; --info-rgb:120,170,255;
+  --loc-warrington:#d08c52; --grad-mid:#a9cf6e;
+  /* text on a tinted (translucent-accent) chip */
+  --tint-red:#f3a0a0; --tint-amber:#f0cd86; --tint-green:#d6f5e6;
+  --tint-blue:#d8e6fb; --tint-orange:#fbdcc4;
+  /* panels, hero, chrome */
+  --panel-0:#1a2b47; --panel-1:#15233b; --panel-2:#13203a;
+  --hero-1:#12203a; --hero-2:#0f1b2d; --hero-3:#0d1626;
+  --mark-bg:#000; --chart-grid:#22344e;
+  --backdrop-rgb:8,14,24;        /* modal scrim */
+  --shadow-rgb:0,0,0;            /* every box-shadow */
+  --lift-rgb:255,255,255;        /* hover / zebra lift over a surface */
+  --shadow:0 10px 30px rgba(var(--shadow-rgb),.35);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  /* THREE TIERS OF DEPTH, and they must stay three: the page (--navy) is a soft, slightly
+     cool grey; the card (--card) is near-white and therefore visibly LIFTS off it; --line
+     is a fine neutral hairline that draws the card's edge. Tone step + hairline do the
+     work — the shadows below are deliberately soft. --navy-2 is the recessed inset inside
+     a card (toolbars, sticky heads, sub-panels), so it sits BELOW the card, not above. */
+  --navy:#f2f4f8; --navy-2:#e8ecf3; --card:#ffffff; --card-2:#f7f9fc;
+  --line:#dde2ea; --line-rgb:203,211,223;
+  /* dark-but-soft ink — a cool near-black, never #000; --ink-dim/-faint are muted greys */
+  --ink:#1d2330; --ink-dim:#5a6474; --ink-faint:#6e7889; --ink-strong:#0d1119;
+  --ink-dim-rgb:90,100,116; --ink-faint-rgb:110,120,137;
+  --on-accent:#fff;
+  /* the brand accent — a muted, low-strain SLATE-BLUE (see the note above about the name) */
+  --orange:#4a5f8a; --orange-soft:#3a4d73; --orange-rgb:74,95,138;
+  --green:#17804d; --green-2:#0f6d40; --green-rgb:23,128,77; --green2-rgb:15,109,64;
+  --amber:#9a6a05; --amber-2:#8a5e04; --amber-rgb:154,106,5; --amber2-rgb:138,94,4;
+  --red:#b81e28; --red-2:#9c1b23; --red-rgb:184,30,40; --red2-rgb:156,27,35;
+  --teal:#0d7d8a; --teal-soft:#0a6873; --teal-bright:#08555e; --teal-rgb:13,125,138;
+  --blue:#6247b5; --blue-soft:#513a99; --blue-rgb:98,71,181;
+  --info:#2b6cd9; --info-rgb:43,108,217;
+  --loc-warrington:#8a4b23; --grad-mid:#6d9a2e;
+  /* on light these become the DEEP version of the accent — the chip behind them is a
+     pale tint, so a pale text colour would vanish */
+  --tint-red:#9c2f24; --tint-amber:#7a5504; --tint-green:#136540;
+  --tint-blue:#46337f; --tint-orange:#33456b;
+  --panel-0:#f6f8fc; --panel-1:#f2f5fa; --panel-2:#ebeff7;
+  --hero-1:#f7f9fd; --hero-2:#f2f4f8; --hero-3:#eaeff6;
+  --mark-bg:#eef1f7; --chart-grid:#e3e8f0;
+  --backdrop-rgb:26,33,48;
+  --shadow-rgb:116,127,148;
+  --lift-rgb:24,35,56;
+  --shadow:0 10px 30px rgba(var(--shadow-rgb),.35);
+}
+
+/* Checklist-only METRICS. Not theme, not shared with the dashboard — this is the
+   density scale from the earlier pass and the brief keeps layout as it is. */
+:root {
   --pad-card: 13px 15px;
   --gap-card: 10px;
   --gap-row: 5px;
@@ -28,17 +96,23 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 
+/* The hidden attribute must win over any author display rule. The UA stylesheet
+   sets [hidden]{display:none}, but ANY author rule setting display beats it —
+   so .banner--block{display:flex} or .stats{display:flex} would paint an
+   element that JS has marked hidden. Keep this above every layout rule. */
+[hidden] { display: none !important; }
+
+html, body { background: var(--navy); color: var(--ink); }
 body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--sans);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
 }
 
 :where(a, button, input, textarea, [tabindex]):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--orange);
   outline-offset: 2px;
 }
 
@@ -50,10 +124,9 @@ body {
 
 /* ---------- Header / hero ---------- */
 .hero {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-top: 3px solid var(--accent);
-  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 14px 16px;
   margin-bottom: var(--gap-card);
@@ -68,39 +141,65 @@ body {
 .hero__title {
   margin: 0;
   font-size: 1.15rem;
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: -0.01em;
 }
 .hero__subtitle {
   margin: 1px 0 0;
-  color: var(--ink-soft);
+  color: var(--ink-dim);
   font-size: 0.85rem;
 }
+.hero__lead { min-width: 0; }
 .hero__meta {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  gap: 4px;
 }
 .hero__date {
-  margin: 3px 0 0;
+  margin: 0;
   color: var(--ink-faint);
   font-size: 0.8rem;
-  font-weight: 400;
+  font-weight: 600;
   white-space: nowrap;
 }
+
+/* theme toggle — the dashboard's .themebtn chip, re-homed into the header now
+   that the top nav is gone. Same visual language (transparent, hairline border,
+   heavy small caps), trimmed to sit against a card rather than a nav strip. */
+.themebtn {
+  flex: 0 0 auto;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-dim);
+  border-radius: 10px;
+  padding: 6px 11px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.themebtn:hover { color: var(--ink); background: var(--navy-2); border-color: var(--orange); }
 
 /* save indicator — sits under the date, never reflows the header */
 .savestate {
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--ink-faint);
   white-space: nowrap;
 }
-.savestate--saved { color: var(--win); }
-.savestate--error { color: var(--error-ink); }
+.savestate--saved { color: var(--green); }
+.savestate--error { color: var(--red); }
 
+/* ---------- Stat tiles ----------
+   Same construction as the dashboard's .sup tile, but on --navy-2: these sit
+   INSIDE the hero card, and --navy-2 is the dashboard's recessed-inset tone. */
 .stats {
   display: flex;
   gap: 8px;
@@ -110,9 +209,9 @@ body {
 .stat {
   flex: 1 1 0;
   min-width: 88px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  background: var(--navy-2);
+  border: 1px solid var(--line);
+  border-radius: 13px;
   padding: 6px 10px;
   display: flex;
   flex-direction: column;
@@ -120,43 +219,58 @@ body {
 }
 .stat__value {
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 800;
   line-height: 1.3;
+  letter-spacing: -.3px;
   font-variant-numeric: tabular-nums;
 }
 .stat__label {
   font-size: 0.62rem;
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1.3;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ink-faint);
 }
+/* flag colours on the streak tile — the dashboard's translucent-accent pattern.
+   Green at a 3+ day run, amber at 1-2, neutral at 0. No red: a missed morning
+   is not an error state. */
+.stat--good {
+  background: rgba(var(--green-rgb), .1);
+  border-color: rgba(var(--green-rgb), .4);
+}
+.stat--good .stat__value { color: var(--green); }
+.stat--warn {
+  background: rgba(var(--amber-rgb), .1);
+  border-color: rgba(var(--amber-rgb), .4);
+}
+.stat--warn .stat__value { color: var(--amber); }
+
 .stat--week { justify-content: center; }
 .week { display: flex; gap: 5px; padding: 3px 0 2px; }
 .week__dot {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--surface);
-  border: 1.5px solid var(--border);
+  background: var(--card);
+  border: 1.5px solid var(--line);
 }
-.week__dot--done { background: var(--win); border-color: var(--win); }
-.week__dot--today { box-shadow: 0 0 0 2px rgba(232, 115, 42, 0.35); }
+.week__dot--done { background: var(--green); border-color: var(--green); }
+.week__dot--today { box-shadow: 0 0 0 2px rgba(var(--orange-rgb), 0.35); }
 
 /* ---------- Banner ---------- */
 .banner {
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 10px 14px;
   font-size: 0.88rem;
   margin-bottom: var(--gap-card);
 }
 .banner--error {
-  background: var(--error-bg);
-  border: 1px solid var(--error-border);
-  border-left: 6px solid var(--error-border);
-  color: var(--error-ink);
-  font-weight: 500;
+  background: rgba(var(--red-rgb), .13);
+  border: 1px solid rgba(var(--red-rgb), .3);
+  border-left: 6px solid rgba(var(--red-rgb), .3);
+  color: var(--tint-red);
+  font-weight: 700;
 }
 /* blocking load failure — must read as louder than the transient error banner */
 .banner--block {
@@ -165,18 +279,18 @@ body {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  background: var(--error-bg);
-  border: 1px solid var(--error-border);
-  border-left: 6px solid var(--error-ink);
-  color: var(--error-ink);
-  font-weight: 600;
+  background: rgba(var(--red-rgb), .13);
+  border: 1px solid rgba(var(--red-rgb), .3);
+  border-left: 6px solid var(--red);
+  color: var(--tint-red);
+  font-weight: 800;
 }
 
 /* ---------- Cards ---------- */
 .card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: var(--pad-card);
   margin-bottom: var(--gap-card);
@@ -184,13 +298,13 @@ body {
 .card__title {
   margin: 0 0 9px;
   font-size: 0.9rem;
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: -0.005em;
 }
 .card__count {
   margin-left: 8px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 700;
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -205,12 +319,15 @@ body {
   gap: var(--gap-row);
 }
 .task {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-.task--done { background: var(--win-bg); border-color: #cfe6da; }
+.task--done {
+  background: rgba(var(--green-rgb), .1);
+  border-color: rgba(var(--green-rgb), .4);
+}
 
 /* head is the fixed-height part of the row; the note panel sits under it */
 .task__head {
@@ -228,7 +345,6 @@ body {
   padding: var(--row-pad-y) 0 var(--row-pad-y) var(--row-pad-x);
   min-height: 40px;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
 .task__row input { position: absolute; opacity: 0; pointer-events: none; }
 .task__box {
@@ -237,19 +353,19 @@ body {
   height: var(--box-size);
   border: 2px solid var(--ink-faint);
   border-radius: 7px;
-  background: var(--surface);
+  background: var(--card);
   display: flex;
   align-items: center;
   justify-content: center;
   color: transparent;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 800;
   transition: all 0.15s ease;
 }
 .task--done .task__box {
-  background: var(--win);
-  border-color: var(--win);
-  color: #fff;
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--on-accent);
 }
 .task__label {
   flex: 1 1 auto;
@@ -257,7 +373,7 @@ body {
   font-weight: 400;
   min-width: 0;
 }
-.task--done .task__label { color: var(--win); }
+.task--done .task__label { color: var(--tint-green); }
 .task__link {
   flex: 0 0 auto;
   appearance: none;
@@ -265,19 +381,19 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--accent-ink);
+  border: 1px solid var(--line);
+  background: var(--navy-2);
+  color: var(--orange);
   font: inherit;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 700;
   padding: 4px 9px;
   border-radius: 8px;
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
 }
-.task__link:hover { border-color: var(--accent); }
+.task__link:hover { border-color: var(--orange); }
 
 /* note affordance — same chip language, square */
 .task__note-btn {
@@ -290,22 +406,21 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  background: var(--navy-2);
+  color: var(--ink-dim);
   font: inherit;
   font-size: 0.85rem;
   line-height: 1;
   border-radius: 8px;
   cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
 }
-.task__note-btn:hover { border-color: var(--accent); }
-.task__note-btn--filled { border-color: var(--accent); color: var(--accent-ink); }
+.task__note-btn:hover { border-color: var(--orange); }
+.task__note-btn--filled { border-color: var(--orange); color: var(--orange); }
 .task__note-btn[aria-expanded="true"] {
-  background: var(--surface);
-  border-color: var(--accent);
-  color: var(--accent-ink);
+  background: var(--card);
+  border-color: var(--orange);
+  color: var(--orange);
 }
 .task__note-btn:disabled { opacity: 0.55; cursor: default; }
 
@@ -317,8 +432,8 @@ body {
 .field__label {
   display: block;
   font-size: 0.78rem;
-  font-weight: 400;
-  color: var(--ink-soft);
+  font-weight: 600;
+  color: var(--ink-dim);
   margin-bottom: 5px;
 }
 .field__input {
@@ -326,9 +441,9 @@ body {
   font: inherit;
   font-size: 0.9rem;
   padding: 8px 11px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--navy-2);
   color: var(--ink);
   resize: vertical;
   min-height: 38px;
@@ -342,64 +457,70 @@ body {
   gap: 10px;
   margin-top: 9px;
 }
-.notes__status { font-size: 0.82rem; font-weight: 500; color: var(--win); }
-.notes__status--error { color: var(--error-ink); }
+.notes__status { font-size: 0.82rem; font-weight: 700; color: var(--green); }
+.notes__status--error { color: var(--red); }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons ----------
+   .btn is the dashboard's .abtn: a neutral card-toned button with a hairline
+   border. The dashboard has no filled primary button anywhere — the only solid
+   accent fill on the whole site is the active nav tab. */
 .btn {
   appearance: none;
   -webkit-appearance: none;
-  border: none;
-  font: inherit;
-  font-weight: 500;
-  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 15px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
-  padding: 8px 15px;
-  font-size: 0.875rem;
-  -webkit-tap-highlight-color: transparent;
 }
+.btn:active:not(:disabled) { transform: translateY(1px); }
 .btn:disabled { opacity: 0.55; cursor: default; }
-.btn--primary { background: var(--accent); color: #fff; }
-.btn--primary:hover:not(:disabled) { background: var(--accent-ink); }
+.btn--primary { background: var(--card); color: var(--ink); }
+.btn--primary:hover:not(:disabled) { border-color: var(--orange); }
+.btn--ghost { color: var(--ink-dim); }
+.btn--ghost:hover:not(:disabled) { color: var(--ink); }
+/* Submit is the only solid-accent fill on the page. The dashboard reserves that
+   treatment for its active nav tab; with the nav gone this is the one place it
+   is used, because Submit is the page's single terminal action and the neutral
+   .abtn treatment lost it entirely. */
 .btn--big {
   width: 100%;
-  padding: 11px 18px;
-  font-size: 0.95rem;
+  padding: 12px 18px;
+  font-size: 15px;
   margin-top: 10px;
+  background: var(--orange);
+  color: var(--on-accent);
+  border-color: var(--orange);
 }
-.btn--ghost {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--ink-soft);
-  padding: 5px 12px;
-  font-size: 0.82rem;
-}
-.btn--ghost:hover { color: var(--ink); }
+.btn--big:hover:not(:disabled) { background: var(--orange-soft); border-color: var(--orange-soft); }
 
 /* ---------- Submit card ---------- */
-.card--submit { border-top: 3px solid var(--accent); }
 .submit__progress {
   margin: 0 0 7px;
   font-size: 0.85rem;
-  font-weight: 400;
-  color: var(--ink-soft);
+  font-weight: 600;
+  color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
 }
 .progressbar {
   height: 7px;
   border-radius: 999px;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: var(--navy-2);
+  border: 1px solid var(--line);
   overflow: hidden;
 }
 .progressbar__fill {
   height: 100%;
   width: 0%;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--orange);
   transition: width 0.25s ease, background 0.25s ease;
 }
-.progressbar__fill--full { background: var(--win); }
+.progressbar__fill--full { background: var(--green); }
 .submit__hint {
   margin: 8px 0 0;
   font-size: 0.76rem;
@@ -408,8 +529,8 @@ body {
 }
 #submitDone { text-align: center; padding: 4px 0 2px; }
 .done__emoji { margin: 0 0 2px; font-size: 1.7rem; }
-#submitDone .card__title { color: var(--win); }
-.done__text { margin: 0; color: var(--ink-soft); font-size: 0.88rem; }
+#submitDone .card__title { color: var(--green); }
+.done__text { margin: 0; color: var(--ink-dim); font-size: 0.88rem; }
 
 /* ---------- Notes log ---------- */
 .log__head {
@@ -428,30 +549,33 @@ body {
   gap: 8px;
 }
 .log__entry {
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent);
-  border-radius: 10px;
-  background: var(--bg);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--orange);
+  border-radius: 12px;
+  background: var(--navy-2);
   padding: 8px 12px;
 }
 .log__date {
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--ink-faint);
   margin: 0 0 3px;
 }
 .log__note { margin: 3px 0 0; font-size: 0.875rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-.log__tag { font-weight: 500; color: var(--ink-soft); font-size: 0.76rem; }
-.log__empty { margin: 10px 0 0; color: var(--ink-soft); font-size: 0.875rem; }
+.log__tag { font-weight: 700; color: var(--ink-dim); font-size: 0.76rem; }
+.log__empty { margin: 10px 0 0; color: var(--ink-dim); font-size: 0.875rem; }
 
+/* ---------- Footer / build stamp ---------- */
 .foot {
+  margin-top: 30px;
   text-align: center;
   color: var(--ink-faint);
-  font-size: 0.76rem;
-  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.7;
 }
+.foot .stage { margin-left: 10px; opacity: .5; }
 
 /* ---------- Phone width ---------- */
 @media (max-width: 480px) {
@@ -462,10 +586,4 @@ body {
   .task__head { padding-right: 7px; }
   .task__row { padding-left: 9px; }
   .task__notes { padding-left: 9px; padding-right: 9px; }
-  .hero__meta {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
 }

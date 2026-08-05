@@ -373,6 +373,13 @@ function renderStats() {
   const run = computeRun();
   document.getElementById("statRun").textContent = run === 1 ? "1 day" : `${run} days`;
 
+  // Flag colour on the streak tile, using the dashboard's translucent-accent
+  // pattern. Green at a 3+ day run, amber at 1-2, neutral at 0 — deliberately
+  // no red, since a missed morning is not an error state.
+  const runTile = document.getElementById("statRunTile");
+  runTile.classList.toggle("stat--good", run >= 3);
+  runTile.classList.toggle("stat--warn", run > 0 && run < 3);
+
   // Month name comes from currentDate, not from a fresh Date() — otherwise the
   // count (which is keyed off currentDate) and its label disagree across a
   // month boundary.
@@ -576,6 +583,44 @@ document.addEventListener("visibilitychange", () => {
 // pagehide covers the cases visibilitychange does not: tab close, back/forward
 // navigation, and iOS killing the page outright.
 window.addEventListener("pagehide", flushOnExit);
+
+/* ---------------- Light / dark theme ----------------
+   Inherited from the dashboard: same function names, same data-theme attribute
+   on <html>, same localStorage key ("bodysculpt:theme"), so a choice made on
+   either site is honoured by the other. Purely visual — no render path, no
+   data and no behaviour depends on it. The boot script in <head> applies the
+   stored value before the stylesheet parses; this only handles the toggle. */
+function bsTheme() {
+  try { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
+  catch (e) { return "light"; }
+}
+function bsSetTheme(t) {
+  const next = t === "dark" ? "dark" : "light";
+  try { document.documentElement.setAttribute("data-theme", next); } catch (e) {}
+  try { localStorage.setItem("bodysculpt:theme", next); } catch (e) {}
+  // keep the iOS status bar in step with the page background
+  const meta = document.getElementById("themeColorMeta");
+  if (meta) meta.setAttribute("content", next === "dark" ? "#0f1b2d" : "#f2f4f8");
+  bsSyncThemeBtn();
+  return next;
+}
+function bsToggleTheme() { return bsSetTheme(bsTheme() === "dark" ? "light" : "dark"); }
+// The button offers the theme you'd switch TO, so its label always names the next state.
+function bsSyncThemeBtn() {
+  const b = document.getElementById("themeToggle");
+  if (!b) return;
+  const dark = bsTheme() === "dark";
+  b.textContent = dark ? "☀ Light" : "☾ Dark";
+  b.title = dark ? "Switch to the light theme" : "Switch to the dark theme";
+  b.setAttribute("aria-pressed", dark ? "true" : "false");
+}
+// Boot: the <head> script already applied the stored theme, so only the button
+// label and the status-bar colour need bringing into line on first paint.
+bsSyncThemeBtn();
+(function syncThemeColorOnBoot() {
+  const meta = document.getElementById("themeColorMeta");
+  if (meta) meta.setAttribute("content", bsTheme() === "dark" ? "#0f1b2d" : "#f2f4f8");
+})();
 
 /* ---------------- Wire up ---------------- */
 document.getElementById("generalNotes").addEventListener("input", (e) => {
