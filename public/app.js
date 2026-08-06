@@ -21,6 +21,7 @@ const TASKS = [
   {
     id: "clients",
     label: "Check in with clients",
+    link: { url: "https://bodysculpt4.trainerize.com/app/overview", text: "Trainerize ↗" },
     notes: { field: "clientNotes", placeholder: "Client check-in notes…", title: "Check-in notes" },
   },
   { id: "leads", label: "Follow up leads that are parked or have been quiet for 2 weeks" },
