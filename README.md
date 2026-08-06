@@ -1,7 +1,7 @@
 # Lead-Gen Hour — Daily Checklist
 
 Single-page daily lead-generation checklist for Bodysculpt's 9–10am lead-gen hour.
-Five tasks with tickboxes, a notes log, a submit flow, and a forgiving streak tracker.
+Seven tasks with tickboxes, per-task notes, a notes log, a submit flow, and a forgiving streak tracker.
 All data lives in **Netlify Blobs** (store: `leadgen`) — no database, no accounts.
 
 ## Stack
@@ -30,8 +30,8 @@ Local runs use a sandboxed Blobs store (nothing touches production data).
 
 - **Ticks & notes autosave** (debounced) to `day:<YYYY-MM-DD>` — reopening the same day
   restores your progress; a new calendar day starts fresh automatically.
-- **Save notes** appends today's general + client-check-in notes to a persistent log
-  (`noteslog`), viewable under **Past notes**.
+- **Notes log** — submitting a day appends its client check-in notes to a persistent
+  log (`noteslog`), viewable under **Past notes**.
 - **Submit today** locks the day (further writes to a submitted day are rejected
   server-side) and records it in `history`.
 - **Streak** is forgiving: a single missed day is skipped; only two consecutive

@@ -3,15 +3,35 @@
 /* ---------------- Config ---------------- */
 /* Completion is keyed by these stable ids, never by position — reordering is
    safe, but an id here must also exist in TASK_IDS in netlify/functions/api.mjs
-   or the server will silently drop its ticks. */
+   or the server will silently drop its ticks. Labels are free to change: they
+   are display-only and no stored record references them.
+
+   `notes` gives a task its own collapsible note. `field` is the day-record
+   field the text is stored in and must also exist in NOTE_FIELDS in
+   netlify/functions/api.mjs, or the note will save to nothing. */
 const TASKS = [
-  { id: "ads", label: "Launch / tweak new ads", link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" } },
-  { id: "content", label: "Post content / stories" },
-  { id: "texts", label: "Texts + follow-ups", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" } },
-  { id: "clients", label: "Check in with clients", notes: true },
-  { id: "leads", label: "Reach out to old leads" },
+  {
+    id: "ads",
+    label: "Launch / tweak new ads",
+    link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" },
+    notes: { field: "adsNotes", placeholder: "Ad notes…", title: "Ad notes" },
+  },
+  { id: "content", label: "Post content / stories", link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" } },
+  { id: "texts", label: "Message new leads", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" } },
+  {
+    id: "clients",
+    label: "Check in with clients",
+    notes: { field: "clientNotes", placeholder: "Client check-in notes…", title: "Check-in notes" },
+  },
+  { id: "leads", label: "Follow up leads that are parked or have been quiet for 2 weeks" },
   { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
+  { id: "dm", label: "DM outreach" },
 ];
+
+/* Every free-text field the day record carries, derived from TASKS so adding a
+   note to a task is a one-line change. Save, restore and exit-flush all iterate
+   this — none of them names a field directly. */
+const NOTE_FIELDS = TASKS.filter((t) => t.notes).map((t) => t.notes.field);
 
 const NOTES_DEBOUNCE_MS = 600;
 
@@ -19,8 +39,7 @@ const emptyChecked = () => Object.fromEntries(TASKS.map((t) => [t.id, false]));
 const emptyState = () => ({
   checked: emptyChecked(),
   submitted: false,
-  generalNotes: "",
-  clientNotes: "",
+  ...Object.fromEntries(NOTE_FIELDS.map((f) => [f, ""])),
 });
 
 /* ---------------- State ---------------- */
@@ -45,7 +64,7 @@ let savedFlashTimer = null;
 
 let lastSavedNotes = null; // snapshot of last notes saved to the log
 let logLoaded = false;
-let notesOpen = false; // whether the collapsible task note panel is expanded
+let notesOpen = {}; // task id → whether its collapsible note panel is expanded
 
 /* ---------------- Date helpers ----------------
    todayStr() is the ONE place a date key is ever generated, and it is purely
@@ -162,17 +181,25 @@ function queueNote(field, value) {
 function hasPending() {
   return (
     Object.keys(pending.checked).length > 0 ||
-    "generalNotes" in pending ||
-    "clientNotes" in pending
+    NOTE_FIELDS.some((f) => f in pending)
   );
+}
+
+/* The one place a write payload is built, for both the normal save path and the
+   exit flush — so the two can never drift into disagreeing about what gets
+   sent. Only changed fields are included; absent means "leave alone" server-side. */
+function buildPayload() {
+  const payload = { date: currentDate };
+  if (Object.keys(pending.checked).length) payload.checked = { ...pending.checked };
+  for (const f of NOTE_FIELDS) {
+    if (f in pending) payload[f] = pending[f];
+  }
+  return payload;
 }
 
 function takePending() {
   if (!hasPending()) return null;
-  const payload = { date: currentDate };
-  if (Object.keys(pending.checked).length) payload.checked = { ...pending.checked };
-  if ("generalNotes" in pending) payload.generalNotes = pending.generalNotes;
-  if ("clientNotes" in pending) payload.clientNotes = pending.clientNotes;
+  const payload = buildPayload();
   pending = { checked: {} };
   return payload;
 }
@@ -185,8 +212,9 @@ function restorePending(payload) {
       if (!(id in pending.checked)) pending.checked[id] = v;
     }
   }
-  if ("generalNotes" in payload && !("generalNotes" in pending)) pending.generalNotes = payload.generalNotes;
-  if ("clientNotes" in payload && !("clientNotes" in pending)) pending.clientNotes = payload.clientNotes;
+  for (const f of NOTE_FIELDS) {
+    if (f in payload && !(f in pending)) pending[f] = payload[f];
+  }
 }
 
 async function pushState() {
@@ -234,12 +262,7 @@ async function pushState() {
    page survives, saving it again is harmless and covers a beacon that failed. */
 function flushOnExit() {
   if (!loaded || !hasPending()) return;
-  const payload = { date: currentDate };
-  if (Object.keys(pending.checked).length) payload.checked = { ...pending.checked };
-  if ("generalNotes" in pending) payload.generalNotes = pending.generalNotes;
-  if ("clientNotes" in pending) payload.clientNotes = pending.clientNotes;
-
-  const body = JSON.stringify(payload);
+  const body = JSON.stringify(buildPayload());
   let sent = false;
   if (navigator.sendBeacon) {
     // sendBeacon cannot set headers, so the content type rides on the Blob.
@@ -312,19 +335,21 @@ function renderTasks() {
     li.append(head);
 
     if (task.notes) {
+      const field = task.notes.field;
       const panelId = `taskNotes-${task.id}`;
+      const open = !!notesOpen[task.id];
 
       const wrap = document.createElement("div");
       wrap.className = "task__notes";
       wrap.id = panelId;
-      wrap.hidden = !notesOpen;
+      wrap.hidden = !open;
 
       const ta = document.createElement("textarea");
       ta.className = "field__input field__input--small";
-      ta.id = "clientNotes";
+      ta.id = `note-${task.id}`;
       ta.rows = 2;
-      ta.placeholder = "Client check-in notes…";
-      ta.value = state.clientNotes;
+      ta.placeholder = task.notes.placeholder;
+      ta.value = state[field] || "";
       ta.disabled = inputsDisabled();
       wrap.append(ta);
 
@@ -332,23 +357,24 @@ function renderTasks() {
       const toggle = document.createElement("button");
       toggle.type = "button";
       toggle.className =
-        "task__note-btn" + (state.clientNotes.trim() ? " task__note-btn--filled" : "");
+        "task__note-btn" + (ta.value.trim() ? " task__note-btn--filled" : "");
       toggle.textContent = "🗒";
-      toggle.title = "Check-in notes";
-      toggle.setAttribute("aria-label", "Check-in notes");
-      toggle.setAttribute("aria-expanded", String(notesOpen));
+      toggle.title = task.notes.title;
+      toggle.setAttribute("aria-label", task.notes.title);
+      toggle.setAttribute("aria-expanded", String(open));
       toggle.setAttribute("aria-controls", panelId);
 
       ta.addEventListener("input", () => {
-        state.clientNotes = ta.value;
+        state[field] = ta.value;
         toggle.classList.toggle("task__note-btn--filled", ta.value.trim() !== "");
-        queueNote("clientNotes", ta.value);
+        queueNote(field, ta.value);
       });
       toggle.addEventListener("click", () => {
-        notesOpen = !notesOpen;
-        wrap.hidden = !notesOpen;
-        toggle.setAttribute("aria-expanded", String(notesOpen));
-        if (notesOpen) ta.focus();
+        const next = !notesOpen[task.id];
+        notesOpen[task.id] = next;
+        wrap.hidden = !next;
+        toggle.setAttribute("aria-expanded", String(next));
+        if (next) ta.focus();
       });
 
       head.append(toggle);
@@ -411,65 +437,40 @@ function renderSubmitState() {
         ? `Nice work — that's a ${run}-day run. See you tomorrow at 9am.`
         : "Nice work — today is logged. See you tomorrow at 9am.";
   }
-  document.getElementById("generalNotes").disabled = inputsDisabled();
-  document.getElementById("saveNotesBtn").disabled = inputsDisabled();
   document.getElementById("submitBtn").disabled = !loaded;
-  const clientTa = document.getElementById("clientNotes");
-  if (clientTa) clientTa.disabled = inputsDisabled();
   document.querySelectorAll("#taskList input").forEach((el) => (el.disabled = inputsDisabled()));
+  document.querySelectorAll("#taskList textarea").forEach((el) => (el.disabled = inputsDisabled()));
 }
 
 function renderAll() {
   document.getElementById("todayLabel").textContent = prettyDate(currentDate);
-  document.getElementById("generalNotes").value = state.generalNotes;
   renderTasks();
   renderProgress();
   renderStats();
   renderSubmitState();
 }
 
-/* ---------------- Notes log ---------------- */
-async function saveNotes({ silent = false } = {}) {
-  const general = state.generalNotes.trim();
-  const clients = state.clientNotes.trim();
-  const status = document.getElementById("notesStatus");
-  if (!general && !clients) {
-    if (!silent) {
-      status.textContent = "Nothing to save yet";
-      status.classList.add("notes__status--error");
-      setTimeout(() => { status.textContent = ""; status.classList.remove("notes__status--error"); }, 2500);
-    }
-    return;
-  }
-  const snapshot = `${general}\n---\n${clients}`;
-  if (snapshot === lastSavedNotes) {
-    if (!silent) flashStatus("Already saved ✓");
-    return;
-  }
+/* ---------------- Notes log ----------------
+   Called only on submit now that the day-notes card is gone: it captures the
+   day's client check-in notes into the persistent log. Task notes themselves
+   live in the day record and are saved by the autosave path above — this is
+   only the log copy. */
+async function saveNotes() {
+  const clients = (state.clientNotes || "").trim();
+  if (!clients) return;
+  if (clients === lastSavedNotes) return;
   try {
     await api("notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: currentDate, general, clients }),
+      body: JSON.stringify({ date: currentDate, general: "", clients }),
     });
-    lastSavedNotes = snapshot;
+    lastSavedNotes = clients;
     logLoaded = false; // refresh log next time it's opened
-    if (!silent) flashStatus("Saved to log ✓");
     clearError();
   } catch (e) {
-    if (!silent) {
-      status.textContent = "Save failed";
-      status.classList.add("notes__status--error");
-    }
     showError(`Couldn't save notes: ${e.message}`);
   }
-}
-
-function flashStatus(msg) {
-  const status = document.getElementById("notesStatus");
-  status.classList.remove("notes__status--error");
-  status.textContent = msg;
-  setTimeout(() => { if (status.textContent === msg) status.textContent = ""; }, 2500);
 }
 
 async function loadLog() {
@@ -520,7 +521,7 @@ async function submitDay() {
   btn.textContent = "Submitting…";
   try {
     await pushState(); // flush any pending tick/notes changes first
-    await saveNotes({ silent: true }); // capture today's notes in the log
+    await saveNotes(); // capture today's check-in notes in the log
     const { history: h } = await api("submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -571,7 +572,7 @@ document.addEventListener("visibilitychange", () => {
   if (todayStr() !== currentDate) {
     state = emptyState();
     pending = { checked: {} };
-    notesOpen = false;
+    notesOpen = {};
     load();
   } else if (hasPending()) {
     pushState();
@@ -623,11 +624,6 @@ bsSyncThemeBtn();
 })();
 
 /* ---------------- Wire up ---------------- */
-document.getElementById("generalNotes").addEventListener("input", (e) => {
-  state.generalNotes = e.target.value;
-  queueNote("generalNotes", e.target.value);
-});
-document.getElementById("saveNotesBtn").addEventListener("click", () => saveNotes());
 document.getElementById("submitBtn").addEventListener("click", submitDay);
 document.getElementById("retryLoadBtn").addEventListener("click", load);
 document.getElementById("toggleLogBtn").addEventListener("click", async (e) => {

@@ -15,15 +15,23 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Allowlist for POST /api/state — must stay in sync with TASKS in public/app.js.
 // Additive only: ids are stable, and days saved before an id existed simply
 // read back as unticked.
-const TASK_IDS = ["ads", "content", "texts", "clients", "leads", "onboarding"];
+const TASK_IDS = ["ads", "content", "texts", "clients", "leads", "onboarding", "dm"];
+// Allowlist for the free-text fields on a day record — must stay in sync with
+// NOTE_FIELDS in public/app.js. Same additive rule as TASK_IDS.
+//
+// `generalNotes` is retained deliberately. Its UI (the "Notes — what happened
+// today" card) was removed, so nothing writes it any more, but days already
+// stored carry one and the merge below leaves untouched fields alone. Dropping
+// it from here would not delete anything, but keeping it means the historic
+// values stay readable in the record rather than becoming invisible.
+const NOTE_FIELDS = ["generalNotes", "clientNotes", "adsNotes"];
 const MAX_LOG_ENTRIES = 1000;
 const MAX_NOTE_LEN = 5000;
 
 const emptyDay = () => ({
   checked: Object.fromEntries(TASK_IDS.map((id) => [id, false])),
   submitted: false,
-  generalNotes: "",
-  clientNotes: "",
+  ...Object.fromEntries(NOTE_FIELDS.map((f) => [f, ""])),
 });
 
 const json = (data, status = 200) =>
@@ -94,12 +102,13 @@ export default async (req) => {
           if (typeof body.checked[id] === "boolean") checked[id] = body.checked[id];
         }
       }
-      const day = {
-        ...cur,
-        checked,
-        generalNotes: body.generalNotes !== undefined ? cleanNote(body.generalNotes) : cur.generalNotes,
-        clientNotes: body.clientNotes !== undefined ? cleanNote(body.clientNotes) : cur.clientNotes,
-      };
+      const day = { ...cur, checked };
+      for (const f of NOTE_FIELDS) {
+        // undefined means "not sent, leave alone" — the contract above. Only a
+        // field the client explicitly included is ever overwritten.
+        if (body[f] !== undefined) day[f] = cleanNote(body[f]);
+        else if (day[f] === undefined) day[f] = "";
+      }
       await store.setJSON(key, day);
       return json({ ok: true, day });
     }
