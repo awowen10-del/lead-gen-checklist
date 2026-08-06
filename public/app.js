@@ -8,7 +8,10 @@
 
    `notes` gives a task its own collapsible note. `field` is the day-record
    field the text is stored in and must also exist in NOTE_FIELDS in
-   netlify/functions/api.mjs, or the note will save to nothing. */
+   netlify/functions/api.mjs, or the note will save to nothing.
+
+   `link` is one chip or an array of them; they render in the order given.
+   Keep the text short — chips sit on the task row and must not wrap. */
 const TASKS = [
   {
     id: "ads",
@@ -26,7 +29,14 @@ const TASKS = [
   },
   { id: "leads", label: "Follow up leads that are parked or have been quiet for 2 weeks" },
   { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
-  { id: "dm", label: "DM outreach" },
+  {
+    id: "dm",
+    label: "DM outreach",
+    link: [
+      { url: "https://www.instagram.com", text: "Instagram ↗" },
+      { url: "https://business.facebook.com/latest/inbox/all", text: "Meta Inbox ↗" },
+    ],
+  },
 ];
 
 /* Every free-text field the day record carries, derived from TASKS so adding a
@@ -323,13 +333,15 @@ function renderTasks() {
     row.append(input, box, label);
     head.append(row);
 
-    if (task.link) {
+    // One chip or several — a lone object is treated as a list of one so the
+    // common single-link case stays a plain object in TASKS.
+    for (const link of [].concat(task.link || [])) {
       const a = document.createElement("a");
       a.className = "task__link";
-      a.href = task.link.url;
+      a.href = link.url;
       a.target = "_blank";
       a.rel = "noopener";
-      a.textContent = task.link.text;
+      a.textContent = link.text;
       head.append(a);
     }
 
