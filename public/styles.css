@@ -428,6 +428,27 @@ body {
   padding: 0 var(--row-pad-x) 9px calc(var(--row-pad-x) + var(--box-size) + 10px);
 }
 
+/* Read-only mirror of another task's note. Same panel geometry and the same
+   sunken field surface as a real textarea, minus the caret — it should read as
+   information, not as somewhere to type. */
+.task__mirror-label {
+  margin: 0 0 5px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+.task__mirror-text {
+  margin: 0;
+  font-size: 0.875rem;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--navy-2);
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Fields / notes ---------- */
 .field__label {
   display: block;

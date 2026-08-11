@@ -11,24 +11,18 @@
    netlify/functions/api.mjs, or the note will save to nothing.
 
    `link` is one chip or an array of them; they render in the order given.
-   Keep the text short — chips sit on the task row and must not wrap. */
+   Keep the text short — chips sit on the task row and must not wrap.
+
+   `mirror` shows ANOTHER task's note here, read-only. It reads an existing
+   field and writes nothing, so it adds no field to the day record.
+
+   Array order IS the display order, and it is deliberate: check-ins sit
+   immediately before content because the wins captured there are the material
+   for the day's stories. Reordering is safe — nothing stored references
+   position — but keep that pair adjacent and in that order. */
 const TASKS = [
-  {
-    id: "ads",
-    label: "Launch / tweak new ads",
-    link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" },
-    notes: { field: "adsNotes", placeholder: "Ad notes…", title: "Ad notes" },
-  },
-  { id: "content", label: "Post content / stories", link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" } },
   { id: "texts", label: "Message new leads", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" } },
-  {
-    id: "clients",
-    label: "Check in with clients",
-    link: { url: "https://bodysculpt4.trainerize.com/app/overview", text: "Trainerize ↗" },
-    notes: { field: "clientNotes", placeholder: "Client check-in notes…", title: "Check-in notes" },
-  },
   { id: "leads", label: "Follow up leads that are parked or have been quiet for 2 weeks" },
-  { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
   {
     id: "dm",
     label: "DM outreach",
@@ -37,6 +31,29 @@ const TASKS = [
       { url: "https://business.facebook.com/latest/inbox/all", text: "Meta Inbox ↗" },
     ],
   },
+  {
+    id: "ads",
+    label: "Launch / tweak new ads",
+    link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" },
+    notes: { field: "adsNotes", placeholder: "Ad notes…", title: "Ad notes" },
+  },
+  {
+    id: "clients",
+    label: "Check in with clients",
+    link: { url: "https://bodysculpt4.trainerize.com/app/overview", text: "Trainerize ↗" },
+    notes: {
+      field: "clientNotes",
+      placeholder: "Wins, quotes, transformations — anything worth posting",
+      title: "Check-in notes",
+    },
+  },
+  {
+    id: "content",
+    label: "Post content / stories",
+    link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" },
+    mirror: { field: "clientNotes", title: "Today's check-in wins" },
+  },
+  { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
 ];
 
 /* Every free-text field the day record carries, derived from TASKS so adding a
@@ -380,6 +397,7 @@ function renderTasks() {
       ta.addEventListener("input", () => {
         state[field] = ta.value;
         toggle.classList.toggle("task__note-btn--filled", ta.value.trim() !== "");
+        syncMirrors();
         queueNote(field, ta.value);
       });
       toggle.addEventListener("click", () => {
@@ -394,7 +412,74 @@ function renderTasks() {
       li.append(wrap);
     }
 
+    /* Read-only view of another task's note, so the wins captured during
+       check-ins are in front of you while posting instead of a scroll away.
+       Nothing here is editable and nothing is saved — the source textarea on
+       the check-in task remains the only writer of the field. Empty source
+       means no panel and no button at all, not an empty box. */
+    if (task.mirror) {
+      const panelId = `taskMirror-${task.id}`;
+      const text = (state[task.mirror.field] || "").trim();
+      const open = !!notesOpen[task.id];
+
+      const wrap = document.createElement("div");
+      wrap.className = "task__notes";
+      wrap.id = panelId;
+      wrap.hidden = !open || !text;
+
+      const heading = document.createElement("p");
+      heading.className = "task__mirror-label";
+      heading.textContent = task.mirror.title;
+
+      const body = document.createElement("p");
+      body.className = "task__mirror-text";
+      body.textContent = text;
+
+      wrap.append(heading, body);
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      // Always "filled": the button only ever exists when there is something
+      // to read, so the accent is the honest state.
+      toggle.className = "task__note-btn task__note-btn--filled";
+      toggle.id = `mirrorBtn-${task.id}`;
+      toggle.textContent = "✨";
+      toggle.title = task.mirror.title;
+      toggle.setAttribute("aria-label", task.mirror.title);
+      toggle.setAttribute("aria-expanded", String(open && !!text));
+      toggle.setAttribute("aria-controls", panelId);
+      toggle.hidden = !text;
+
+      toggle.addEventListener("click", () => {
+        const next = !notesOpen[task.id];
+        notesOpen[task.id] = next;
+        wrap.hidden = !next;
+        toggle.setAttribute("aria-expanded", String(next));
+      });
+
+      head.append(toggle);
+      li.append(wrap);
+    }
+
     list.append(li);
+  }
+}
+
+/* Keep every mirror in step with its source as it is typed. This patches the
+   DOM in place rather than calling renderTasks(), which would rebuild the
+   textarea being typed into and take the caret with it. */
+function syncMirrors() {
+  for (const task of TASKS) {
+    if (!task.mirror) continue;
+    const wrap = document.getElementById(`taskMirror-${task.id}`);
+    const toggle = document.getElementById(`mirrorBtn-${task.id}`);
+    if (!wrap || !toggle) continue;
+    const text = (state[task.mirror.field] || "").trim();
+    const body = wrap.querySelector(".task__mirror-text");
+    if (body) body.textContent = text;
+    toggle.hidden = !text;
+    toggle.setAttribute("aria-expanded", String(!!text && !!notesOpen[task.id]));
+    wrap.hidden = !text || !notesOpen[task.id];
   }
 }
 
