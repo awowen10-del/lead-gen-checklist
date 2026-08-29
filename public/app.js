@@ -16,10 +16,20 @@
    `mirror` shows ANOTHER task's note here, read-only. It reads an existing
    field and writes nothing, so it adds no field to the day record.
 
+   `days` limits a task to certain weekdays, as an array of JS day numbers
+   (0 = Sunday … 6 = Saturday). Absent means every day. The weekday comes from
+   currentDate, never a fresh Date(), so the rows on screen always match the
+   date in the header — including after a rollover while the tab sat open.
+
    Array order IS the display order, and it is deliberate: check-ins sit
    immediately before content because the wins captured there are the material
-   for the day's stories. Reordering is safe — nothing stored references
-   position — but keep that pair adjacent and in that order. */
+   for the day's stories, and the Thursday email sits with content because it
+   is the same job — this week's message — in another channel. Reordering is
+   safe — nothing stored references position — but keep those runs together. */
+
+/* JS getDay() numbers, named so the TASKS entries below read as English. */
+const THU = 4;
+
 const TASKS = [
   { id: "texts", label: "Message new leads", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" } },
   { id: "leads", label: "Follow up leads that are parked or have been quiet for 2 weeks" },
@@ -52,6 +62,16 @@ const TASKS = [
     label: "Post content / stories",
     link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" },
     mirror: { field: "clientNotes", title: "Today's check-in wins" },
+  },
+  {
+    id: "email",
+    label: "Marketing email to prospects and suspects",
+    days: [THU],
+    notes: {
+      field: "emailNotes",
+      placeholder: "Angle, subject line, what you sent…",
+      title: "Email notes",
+    },
   },
   { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
 ];
@@ -103,6 +123,24 @@ function todayStr(offset = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offset);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/* The weekday of a YYYY-MM-DD key, parsed as local time for the same reason
+   todayStr() is local-only: constructing from the parts avoids the UTC shift
+   that Date(iso) would apply and that would land Thursday's task on Wednesday
+   evening for anyone west of UTC. */
+function weekdayOf(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
+/* The tasks that apply to the day being shown. This is the list for EVERY
+   user-facing purpose — rendering, the count, the progress bar — so a task
+   that isn't on today's list cannot silently hold the bar back. TASKS itself
+   stays the full set: it is the schema (ids, note fields), not the day. */
+function visibleTasks() {
+  const dow = weekdayOf(currentDate);
+  return TASKS.filter((t) => !t.days || t.days.includes(dow));
 }
 
 function prettyDate(iso) {
@@ -315,7 +353,7 @@ function inputsDisabled() {
 function renderTasks() {
   const list = document.getElementById("taskList");
   list.innerHTML = "";
-  for (const task of TASKS) {
+  for (const task of visibleTasks()) {
     const li = document.createElement("li");
     li.className = "task" + (state.checked[task.id] ? " task--done" : "");
     li.dataset.id = task.id;
@@ -484,12 +522,14 @@ function syncMirrors() {
 }
 
 function renderProgress() {
-  const done = TASKS.filter((t) => state.checked[t.id]).length;
-  document.getElementById("taskCount").textContent = `${done}/${TASKS.length} done`;
-  document.getElementById("progressLabel").textContent = `${done} of ${TASKS.length} done`;
+  const tasks = visibleTasks();
+  const total = tasks.length;
+  const done = tasks.filter((t) => state.checked[t.id]).length;
+  document.getElementById("taskCount").textContent = `${done}/${total} done`;
+  document.getElementById("progressLabel").textContent = `${done} of ${total} done`;
   const fill = document.getElementById("progressFill");
-  fill.style.width = `${(done / TASKS.length) * 100}%`;
-  fill.classList.toggle("progressbar__fill--full", done === TASKS.length);
+  fill.style.width = `${(done / total) * 100}%`;
+  fill.classList.toggle("progressbar__fill--full", done === total);
 }
 
 function renderStats() {
