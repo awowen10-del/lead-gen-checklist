@@ -43,7 +43,7 @@ const TASKS = [
   },
   {
     id: "ads",
-    label: "Launch / tweak new ads",
+    label: "Review ad performance",
     link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" },
     notes: { field: "adsNotes", placeholder: "Ad notes…", title: "Ad notes" },
   },
