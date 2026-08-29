@@ -92,7 +92,6 @@ const emptyState = () => ({
 
 /* ---------------- State ---------------- */
 let state = emptyState();
-let history = {};
 let currentDate = todayStr();
 
 /* Persistence bookkeeping.
@@ -119,9 +118,8 @@ let notesOpen = {}; // task id → whether its collapsible note panel is expande
    local-time (getFullYear/getMonth/getDate — never toISOString, which would
    shift the key across UTC midnight). currentDate is set from it and from
    nothing else. */
-function todayStr(offset = 0) {
+function todayStr() {
   const d = new Date();
-  d.setDate(d.getDate() + offset);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
@@ -148,32 +146,6 @@ function prettyDate(iso) {
   return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
     weekday: "short", day: "numeric", month: "short",
   });
-}
-
-/* ---------------- Streak logic (forgiving) ----------------
-   Walk back day by day from today (today itself only counts once
-   submitted, and never counts as a miss). A single missed day is
-   skipped; only 2+ consecutive missed days end the run. */
-function computeRun() {
-  let run = 0;
-  let misses = 0;
-  let offset = state.submitted ? 0 : -1;
-  for (let i = 0; i < 366; i++) {
-    const day = todayStr(offset - i);
-    if (history[day]) {
-      run++;
-      misses = 0;
-    } else {
-      misses++;
-      if (misses >= 2) break;
-    }
-  }
-  return run;
-}
-
-function computeMonth() {
-  const prefix = currentDate.slice(0, 7); // YYYY-MM
-  return Object.keys(history).filter((d) => d.startsWith(prefix) && history[d]).length;
 }
 
 /* ---------------- API ---------------- */
@@ -426,7 +398,7 @@ function renderTasks() {
       toggle.type = "button";
       toggle.className =
         "task__note-btn" + (ta.value.trim() ? " task__note-btn--filled" : "");
-      toggle.textContent = "🗒";
+      toggle.textContent = "Note";
       toggle.title = task.notes.title;
       toggle.setAttribute("aria-label", task.notes.title);
       toggle.setAttribute("aria-expanded", String(open));
@@ -481,7 +453,7 @@ function renderTasks() {
       // to read, so the accent is the honest state.
       toggle.className = "task__note-btn task__note-btn--filled";
       toggle.id = `mirrorBtn-${task.id}`;
-      toggle.textContent = "✨";
+      toggle.textContent = "Wins";
       toggle.title = task.mirror.title;
       toggle.setAttribute("aria-label", task.mirror.title);
       toggle.setAttribute("aria-expanded", String(open && !!text));
@@ -532,49 +504,9 @@ function renderProgress() {
   fill.classList.toggle("progressbar__fill--full", done === total);
 }
 
-function renderStats() {
-  document.getElementById("stats").hidden = false;
-  const run = computeRun();
-  document.getElementById("statRun").textContent = run === 1 ? "1 day" : `${run} days`;
-
-  // Flag colour on the streak tile, using the dashboard's translucent-accent
-  // pattern. Green at a 3+ day run, amber at 1-2, neutral at 0 — deliberately
-  // no red, since a missed morning is not an error state.
-  const runTile = document.getElementById("statRunTile");
-  runTile.classList.toggle("stat--good", run >= 3);
-  runTile.classList.toggle("stat--warn", run > 0 && run < 3);
-
-  // Month name comes from currentDate, not from a fresh Date() — otherwise the
-  // count (which is keyed off currentDate) and its label disagree across a
-  // month boundary.
-  const [y, m] = currentDate.split("-").map(Number);
-  const monthName = new Date(y, m - 1, 1).toLocaleDateString("en-GB", { month: "long" });
-  document.getElementById("statMonth").textContent = String(computeMonth());
-  document.getElementById("statMonthLabel").textContent = `✅ days in ${monthName}`;
-
-  const week = document.getElementById("weekDots");
-  week.innerHTML = "";
-  for (let i = 6; i >= 0; i--) {
-    const day = todayStr(-i);
-    const dot = document.createElement("span");
-    dot.className = "week__dot" +
-      (history[day] ? " week__dot--done" : "") +
-      (i === 0 ? " week__dot--today" : "");
-    dot.title = prettyDate(day);
-    week.append(dot);
-  }
-}
-
 function renderSubmitState() {
   document.getElementById("submitPending").hidden = state.submitted;
   document.getElementById("submitDone").hidden = !state.submitted;
-  if (state.submitted) {
-    const run = computeRun();
-    document.getElementById("doneText").textContent =
-      run > 1
-        ? `Nice work — that's a ${run}-day run. See you tomorrow at 9am.`
-        : "Nice work — today is logged. See you tomorrow at 9am.";
-  }
   document.getElementById("submitBtn").disabled = !loaded;
   document.querySelectorAll("#taskList input").forEach((el) => (el.disabled = inputsDisabled()));
   document.querySelectorAll("#taskList textarea").forEach((el) => (el.disabled = inputsDisabled()));
@@ -584,7 +516,6 @@ function renderAll() {
   document.getElementById("todayLabel").textContent = prettyDate(currentDate);
   renderTasks();
   renderProgress();
-  renderStats();
   renderSubmitState();
 }
 
@@ -660,14 +591,17 @@ async function submitDay() {
   try {
     await pushState(); // flush any pending tick/notes changes first
     await saveNotes(); // capture today's check-in notes in the log
-    const { history: h } = await api("submit", {
+    /* The server still keeps its `history` map — it is the record of which
+       days were submitted, and /api/submit returns it — but nothing on this
+       page reads it any more: the streak, month count and week dots are gone
+       deliberately. The response is ignored rather than the route changed, so
+       the record stays intact if it is ever wanted again. */
+    await api("submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: currentDate }),
     });
-    history = h;
     state.submitted = true;
-    renderStats();
     renderSubmitState();
     clearError();
   } catch (e) {
@@ -684,7 +618,6 @@ async function load() {
   try {
     const data = await api(`state?date=${currentDate}`);
     state = { ...state, ...data.day, checked: { ...emptyChecked(), ...data.day.checked } };
-    history = data.history || {};
     loaded = true;
     hideLoadBlocker();
     clearError();
@@ -749,7 +682,7 @@ function bsSyncThemeBtn() {
   const b = document.getElementById("themeToggle");
   if (!b) return;
   const dark = bsTheme() === "dark";
-  b.textContent = dark ? "☀ Light" : "☾ Dark";
+  b.textContent = dark ? "Light" : "Dark";
   b.title = dark ? "Switch to the light theme" : "Switch to the dark theme";
   b.setAttribute("aria-pressed", dark ? "true" : "false");
 }

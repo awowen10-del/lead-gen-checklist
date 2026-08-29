@@ -98,8 +98,8 @@ html, body { margin: 0; padding: 0; }
 
 /* The hidden attribute must win over any author display rule. The UA stylesheet
    sets [hidden]{display:none}, but ANY author rule setting display beats it —
-   so .banner--block{display:flex} or .stats{display:flex} would paint an
-   element that JS has marked hidden. Keep this above every layout rule. */
+   so a rule like .banner--block{display:flex} would paint an element that JS
+   has marked hidden. Keep this above every layout rule. */
 [hidden] { display: none !important; }
 
 html, body { background: var(--navy); color: var(--ink); }
@@ -196,67 +196,6 @@ body {
 }
 .savestate--saved { color: var(--green); }
 .savestate--error { color: var(--red); }
-
-/* ---------- Stat tiles ----------
-   Same construction as the dashboard's .sup tile, but on --navy-2: these sit
-   INSIDE the hero card, and --navy-2 is the dashboard's recessed-inset tone. */
-.stats {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-.stat {
-  flex: 1 1 0;
-  min-width: 88px;
-  background: var(--navy-2);
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  padding: 6px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.stat__value {
-  font-size: 0.95rem;
-  font-weight: 800;
-  line-height: 1.3;
-  letter-spacing: -.3px;
-  font-variant-numeric: tabular-nums;
-}
-.stat__label {
-  font-size: 0.62rem;
-  font-weight: 700;
-  line-height: 1.3;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--ink-faint);
-}
-/* flag colours on the streak tile — the dashboard's translucent-accent pattern.
-   Green at a 3+ day run, amber at 1-2, neutral at 0. No red: a missed morning
-   is not an error state. */
-.stat--good {
-  background: rgba(var(--green-rgb), .1);
-  border-color: rgba(var(--green-rgb), .4);
-}
-.stat--good .stat__value { color: var(--green); }
-.stat--warn {
-  background: rgba(var(--amber-rgb), .1);
-  border-color: rgba(var(--amber-rgb), .4);
-}
-.stat--warn .stat__value { color: var(--amber); }
-
-.stat--week { justify-content: center; }
-.week { display: flex; gap: 5px; padding: 3px 0 2px; }
-.week__dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--card);
-  border: 1.5px solid var(--line);
-}
-.week__dot--done { background: var(--green); border-color: var(--green); }
-.week__dot--today { box-shadow: 0 0 0 2px rgba(var(--orange-rgb), 0.35); }
 
 /* ---------- Banner ---------- */
 .banner {
@@ -395,14 +334,13 @@ body {
 }
 .task__link:hover { border-color: var(--orange); }
 
-/* note affordance — same chip language, square */
+/* note affordance — literally the .task__link chip, in the muted ink colour
+   until it has content. It was a square pictogram button; it is a word now, so
+   the width has to follow the label rather than being fixed. */
 .task__note-btn {
   flex: 0 0 auto;
   appearance: none;
   -webkit-appearance: none;
-  width: 28px;
-  height: 28px;
-  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -410,10 +348,13 @@ body {
   background: var(--navy-2);
   color: var(--ink-dim);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
   line-height: 1;
+  padding: 5px 9px;
   border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
 }
 .task__note-btn:hover { border-color: var(--orange); }
 .task__note-btn--filled { border-color: var(--orange); color: var(--orange); }
@@ -540,7 +481,6 @@ body {
   text-align: center;
 }
 #submitDone { text-align: center; padding: 4px 0 2px; }
-.done__emoji { margin: 0 0 2px; font-size: 1.7rem; }
 #submitDone .card__title { color: var(--green); }
 .done__text { margin: 0; color: var(--ink-dim); font-size: 0.88rem; }
 
@@ -594,7 +534,6 @@ body {
   .app { padding: 12px 10px 32px; }
   .hero { padding: 12px 13px; }
   .card { padding: 11px 12px; }
-  .stat { min-width: 78px; padding: 5px 8px; }
   .task__head { padding-right: 7px; }
   .task__row { padding-left: 9px; }
   .task__notes { padding-left: 9px; padding-right: 9px; }
