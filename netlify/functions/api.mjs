@@ -22,6 +22,13 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // every day and changing the schedule needs no server change and rewrites no
 // history.
 const TASK_IDS = ["ads", "content", "texts", "clients", "leads", "onboarding", "dm", "email"];
+// The subset stored as a number rather than a tick. Their `checked` entry is
+// never written: whether the row is done is derived on the client from the
+// count against a target that can move (the N/A rollover), so storing a
+// snapshot of that judgement here would just be a second, staler answer.
+const COUNT_IDS = ["leads", "dm"];
+const MAX_COUNT = 999;
+const MAX_RECENT_DAYS = 60;
 // Allowlist for the free-text fields on a day record — must stay in sync with
 // NOTE_FIELDS in public/app.js. Same additive rule as TASK_IDS.
 //
@@ -30,15 +37,50 @@ const TASK_IDS = ["ads", "content", "texts", "clients", "leads", "onboarding", "
 // stored carry one and the merge below leaves untouched fields alone. Dropping
 // it from here would not delete anything, but keeping it means the historic
 // values stay readable in the record rather than becoming invisible.
+//
+// `emailNotes` is retained on the same grounds: the Thursday email row lost its
+// note when the list was restructured into sections, so nothing writes it any
+// more, but anything already stored stays readable.
 const NOTE_FIELDS = ["generalNotes", "clientNotes", "adsNotes", "emailNotes"];
 const MAX_LOG_ENTRIES = 1000;
 const MAX_NOTE_LEN = 5000;
 
+/* A day record is the same shape every day. Which ids the client SHOWS on a
+   given date is a client concern (see SECTIONS in public/app.js) and is
+   deliberately not modelled here, so changing the schedule needs no server
+   change and rewrites no history.
+
+   `na` is the one map whose absence is meaningful rather than merely empty: a
+   task not present in it was not marked N/A, which is exactly what the 14-day
+   tally reads. */
 const emptyDay = () => ({
   checked: Object.fromEntries(TASK_IDS.map((id) => [id, false])),
+  counts: Object.fromEntries(COUNT_IDS.map((id) => [id, 0])),
+  na: {},
   submitted: false,
   ...Object.fromEntries(NOTE_FIELDS.map((f) => [f, ""])),
 });
+
+const cleanCount = (v) => {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(MAX_COUNT, n));
+};
+
+/* The last `n` calendar dates ending today, as YYYY-MM-DD. Built from a local
+   Date for the same reason the client does — toISOString would shift the key
+   across UTC midnight and quietly drop or duplicate a day at the window edge. */
+const recentDates = (n) => {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    out.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    );
+  }
+  return out;
+};
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -108,7 +150,19 @@ export default async (req) => {
           if (typeof body.checked[id] === "boolean") checked[id] = body.checked[id];
         }
       }
-      const day = { ...cur, checked };
+      const counts = { ...(cur.counts || {}) };
+      if (body.counts && typeof body.counts === "object") {
+        for (const id of COUNT_IDS) {
+          if (body.counts[id] !== undefined) counts[id] = cleanCount(body.counts[id]);
+        }
+      }
+      const na = { ...(cur.na || {}) };
+      if (body.na && typeof body.na === "object") {
+        for (const id of TASK_IDS) {
+          if (typeof body.na[id] === "boolean") na[id] = body.na[id];
+        }
+      }
+      const day = { ...cur, checked, counts, na };
       for (const f of NOTE_FIELDS) {
         // undefined means "not sent, leave alone" — the contract above. Only a
         // field the client explicitly included is ever overwritten.
@@ -147,6 +201,35 @@ export default async (req) => {
       if (log.length > MAX_LOG_ENTRIES) log = log.slice(-MAX_LOG_ENTRIES);
       await store.setJSON("noteslog", log);
       return json({ ok: true, count: log.length });
+    }
+
+    /* GET /api/recent?days=14 — the raw day records behind the 14-day panel.
+       Only the fields the panel tallies are returned, and notes are deliberately
+       NOT among them: this route exists to count ticks, counts and N/As, and
+       shipping the free text as well would put every note on the wire for a
+       panel that never displays one. Days with no record are simply absent —
+       "the app was never opened" is not the same as "nothing was done", and the
+       client relies on being able to tell them apart. */
+    if (req.method === "GET" && route === "recent") {
+      const asked = parseInt(url.searchParams.get("days") || "14", 10);
+      const n = Math.max(1, Math.min(MAX_RECENT_DAYS, Number.isFinite(asked) ? asked : 14));
+      const dates = recentDates(n);
+      const records = await Promise.all(
+        dates.map((date) => store.get(`day:${date}`, { type: "json" }))
+      );
+      const days = [];
+      for (let i = 0; i < dates.length; i++) {
+        const rec = records[i];
+        if (!rec) continue;
+        days.push({
+          date: dates[i],
+          checked: rec.checked || {},
+          counts: rec.counts || {},
+          na: rec.na || {},
+          submitted: !!rec.submitted,
+        });
+      }
+      return json({ days });
     }
 
     // GET /api/log — the notes log

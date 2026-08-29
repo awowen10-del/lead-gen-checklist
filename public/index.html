@@ -1,20 +1,9 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <script>
-    /* Theme boot — inherited verbatim from the dashboard. Runs before the
-       stylesheet is parsed so the page never flashes the wrong theme. Light is
-       the default; the choice is remembered under the SAME localStorage key the
-       dashboard uses, so the two sites always agree. */
-    (function(){
-      var t = "light";
-      try{ var s = localStorage.getItem("bodysculpt:theme"); if(s === "dark" || s === "light") t = s; }catch(e){}
-      try{ document.documentElement.setAttribute("data-theme", t); }catch(e){}
-    })();
-    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#f2f4f8" id="themeColorMeta" />
+    <meta name="theme-color" content="#f2f4f8" />
     <title>Bodysculpt · Lead-Gen Hour</title>
     <!-- Deliberately blank: an empty inline SVG, not a missing icon. Keeping the
          link means the tab shows nothing rather than the browser firing a
@@ -28,10 +17,9 @@
         <div class="hero__bar">
           <div class="hero__lead">
             <h1 class="hero__title">Lead-Gen Hour</h1>
-            <p class="hero__subtitle">Daily checklist · 9–10am</p>
+            <p class="hero__subtitle">Daily checklist · 9–10:15am</p>
           </div>
           <div class="hero__meta">
-            <button type="button" class="themebtn" id="themeToggle" onclick="bsToggleTheme()" aria-pressed="false" title="Switch theme">Dark</button>
             <p class="hero__date" id="todayLabel"></p>
             <span class="savestate" id="saveState" role="status" aria-live="polite" hidden></span>
           </div>
@@ -49,7 +37,9 @@
           <h2 class="card__title" id="checklistTitle">
             Today's list<span class="card__count" id="taskCount"></span>
           </h2>
-          <ul class="tasks" id="taskList"></ul>
+          <!-- Sections are built by app.js; each renders its own heading and
+               <ul class="tasks">, so this is a plain container, not a list. -->
+          <div id="taskList"></div>
         </section>
 
         <section class="card card--submit" aria-labelledby="submitTitle">
@@ -58,11 +48,24 @@
             <p class="submit__progress" id="progressLabel">0 done</p>
             <div class="progressbar" aria-hidden="true"><div class="progressbar__fill" id="progressFill"></div></div>
             <button class="btn btn--big" id="submitBtn" type="button" disabled>Submit today ✓</button>
-            <p class="submit__hint">Locks in today, feeds your streak, and starts fresh tomorrow.</p>
+            <p class="submit__hint">Locks in today and starts fresh tomorrow.</p>
           </div>
           <div id="submitDone" hidden>
             <h2 class="card__title">Done for today</h2>
             <p class="done__text" id="doneText">Nice work — today is logged. See you tomorrow at 9am.</p>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="recentTitle">
+          <div class="log__head">
+            <h2 class="card__title" id="recentTitle">Last 14 days</h2>
+            <button class="btn btn--ghost" id="toggleRecentBtn" type="button" aria-expanded="false">Show</button>
+          </div>
+          <div id="recentPanel" hidden>
+            <div id="recentFlags"></div>
+            <p class="log__empty" id="recentEmpty" hidden>Nothing logged in the last 14 days yet.</p>
+            <ul class="tallies" id="recentList"></ul>
+            <p class="tallies__foot">N/A counts are out of the days each task was actually on the list.</p>
           </div>
         </section>
 
@@ -80,7 +83,7 @@
 
       <footer class="foot">
         Bodysculpt · consistency beats intensity
-        <span class="stage">build v7 · wins capture</span>
+        <span class="stage">build v8 · hour, tail, counters</span>
       </footer>
     </div>
     <script src="/app.js"></script>

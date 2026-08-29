@@ -1,54 +1,23 @@
 /* ===================== THEME TOKENS =====================
-   Copied VERBATIM from bodysculptdashboard.netlify.app (bodysculpt-FULL-SITE,
+   Copied from bodysculptdashboard.netlify.app (bodysculpt-FULL-SITE,
    index.html) so the two sites share one palette under one set of names. The
    dashboard keeps its tokens inline in every page and has no stylesheet, so
-   there is no shared file to import — keeping the block byte-comparable is the
-   next best thing: to re-sync, diff this block against the dashboard's.
+   there is no shared file to import — keeping the values in step is the next
+   best thing: to re-sync, diff this block against the dashboard's light theme.
 
-   Two themes, one set of names. ":root,:root[data-theme='dark']" is the
-   original dark navy; ":root[data-theme='light']" is the neutral light theme
-   and is the default (see the boot script at the top of index.html).
+   LIGHT ONLY. The dark theme, the data-theme attribute, the toggle and the
+   remembered localStorage choice are all gone by request — there is one
+   palette and it is this one, so no rule anywhere should be conditional on a
+   theme. Do not reintroduce a :root[data-theme=…] selector here.
 
-   The names are historical and do NOT describe the light values: in light,
-   --orange is a muted SLATE-BLUE and --navy is a soft light grey. The dashboard
-   kept the dark-theme names when it re-mapped light, so we keep them too —
-   renaming here would break parity with the site we are matching. */
+   The names are historical and do NOT describe the values: --orange is a muted
+   SLATE-BLUE and --navy is a soft light grey. They are the dashboard's names
+   for the same colours, and renaming here would break parity with the site we
+   are matching. */
 :root{
+  color-scheme:light;
   /* metrics — not themed */
   --radius:16px;
-}
-:root,:root[data-theme="dark"]{
-  color-scheme:dark;
-  /* surfaces */
-  --navy:#0f1b2d; --navy-2:#16273f; --card:#1b2c45; --card-2:#203552;
-  --line:#2c405e; --line-rgb:44,64,94;
-  /* ink */
-  --ink:#eaf0f8; --ink-dim:#9fb1c7; --ink-faint:#6b7f99; --ink-strong:#fff;
-  --ink-dim-rgb:159,177,199; --ink-faint-rgb:107,127,153;
-  --on-accent:#fff;              /* text sitting ON a solid accent fill */
-  /* accents */
-  --orange:#e8732a; --orange-soft:#f0935a; --orange-rgb:232,115,42;
-  --green:#3fbf7f; --green-2:#43c088; --green-rgb:63,191,127; --green2-rgb:67,192,136;
-  --amber:#e8a93a; --amber-2:#f0b73a; --amber-rgb:232,169,58; --amber2-rgb:240,183,58;
-  --red:#e25555; --red-2:#e0574f; --red-rgb:226,85,85; --red2-rgb:214,77,77;
-  --teal:#4fa3b8; --teal-soft:#7fc4d6; --teal-bright:#a9dbe8; --teal-rgb:79,163,184;
-  --blue:#7fa3d4; --blue-soft:#8fb4e8; --blue-rgb:108,150,214;
-  --info:#6aa3e8; --info-rgb:120,170,255;
-  --loc-warrington:#d08c52; --grad-mid:#a9cf6e;
-  /* text on a tinted (translucent-accent) chip */
-  --tint-red:#f3a0a0; --tint-amber:#f0cd86; --tint-green:#d6f5e6;
-  --tint-blue:#d8e6fb; --tint-orange:#fbdcc4;
-  /* panels, hero, chrome */
-  --panel-0:#1a2b47; --panel-1:#15233b; --panel-2:#13203a;
-  --hero-1:#12203a; --hero-2:#0f1b2d; --hero-3:#0d1626;
-  --mark-bg:#000; --chart-grid:#22344e;
-  --backdrop-rgb:8,14,24;        /* modal scrim */
-  --shadow-rgb:0,0,0;            /* every box-shadow */
-  --lift-rgb:255,255,255;        /* hover / zebra lift over a surface */
-  --shadow:0 10px 30px rgba(var(--shadow-rgb),.35);
-}
-:root[data-theme="light"]{
-  color-scheme:light;
   /* THREE TIERS OF DEPTH, and they must stay three: the page (--navy) is a soft, slightly
      cool grey; the card (--card) is near-white and therefore visibly LIFTS off it; --line
      is a fine neutral hairline that draws the card's edge. Tone step + hairline do the
@@ -59,7 +28,7 @@
   /* dark-but-soft ink — a cool near-black, never #000; --ink-dim/-faint are muted greys */
   --ink:#1d2330; --ink-dim:#5a6474; --ink-faint:#6e7889; --ink-strong:#0d1119;
   --ink-dim-rgb:90,100,116; --ink-faint-rgb:110,120,137;
-  --on-accent:#fff;
+  --on-accent:#fff;              /* text sitting ON a solid accent fill */
   /* the brand accent — a muted, low-strain SLATE-BLUE (see the note above about the name) */
   --orange:#4a5f8a; --orange-soft:#3a4d73; --orange-rgb:74,95,138;
   --green:#17804d; --green-2:#0f6d40; --green-rgb:23,128,77; --green2-rgb:15,109,64;
@@ -69,16 +38,17 @@
   --blue:#6247b5; --blue-soft:#513a99; --blue-rgb:98,71,181;
   --info:#2b6cd9; --info-rgb:43,108,217;
   --loc-warrington:#8a4b23; --grad-mid:#6d9a2e;
-  /* on light these become the DEEP version of the accent — the chip behind them is a
-     pale tint, so a pale text colour would vanish */
+  /* text on a tinted (translucent-accent) chip — the DEEP version of each accent,
+     because the chip behind them is a pale tint and pale text would vanish */
   --tint-red:#9c2f24; --tint-amber:#7a5504; --tint-green:#136540;
   --tint-blue:#46337f; --tint-orange:#33456b;
+  /* panels, hero, chrome */
   --panel-0:#f6f8fc; --panel-1:#f2f5fa; --panel-2:#ebeff7;
   --hero-1:#f7f9fd; --hero-2:#f2f4f8; --hero-3:#eaeff6;
   --mark-bg:#eef1f7; --chart-grid:#e3e8f0;
-  --backdrop-rgb:26,33,48;
-  --shadow-rgb:116,127,148;
-  --lift-rgb:24,35,56;
+  --backdrop-rgb:26,33,48;       /* modal scrim */
+  --shadow-rgb:116,127,148;      /* every box-shadow */
+  --lift-rgb:24,35,56;           /* hover / zebra lift over a surface */
   --shadow:0 10px 30px rgba(var(--shadow-rgb),.35);
 }
 
@@ -164,28 +134,6 @@ body {
   white-space: nowrap;
 }
 
-/* theme toggle — the dashboard's .themebtn chip, re-homed into the header now
-   that the top nav is gone. Same visual language (transparent, hairline border,
-   heavy small caps), trimmed to sit against a card rather than a nav strip. */
-.themebtn {
-  flex: 0 0 auto;
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--ink-dim);
-  border-radius: 10px;
-  padding: 6px 11px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: .2px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-.themebtn:hover { color: var(--ink); background: var(--navy-2); border-color: var(--orange); }
-
 /* save indicator — sits under the date, never reflows the header */
 .savestate {
   font-size: 0.7rem;
@@ -248,6 +196,34 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Sections ----------
+   The list is three blocks with their own headings, and the heading carries the
+   time window because that is the whole point of the split: the hour is the
+   hour, the tail is the quarter after it, and the weekly row is neither. */
+.section + .section { margin-top: 14px; }
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 2px 6px;
+}
+.section__title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-dim);
+}
+.section__time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 /* ---------- Tasks ---------- */
 .tasks {
   list-style: none;
@@ -267,16 +243,38 @@ body {
   background: rgba(var(--green-rgb), .1);
   border-color: rgba(var(--green-rgb), .4);
 }
+/* An N/A row is still readable — it has to be, or you cannot un-N/A it — but it
+   recedes, and it never carries the green "done" treatment: not-applicable and
+   completed are different answers and must not look alike. */
+.task--na {
+  background: var(--navy-2);
+  border-color: var(--line);
+  opacity: 0.62;
+}
+.task--na .task__label { text-decoration: line-through; color: var(--ink-faint); }
+.task--na .task__box { border-color: var(--line); background: transparent; }
 
-/* head is the fixed-height part of the row; the note panel sits under it */
+/* head is the top part of the row; the note panel sits under it. It wraps: a
+   counter row on a phone carries links, a counter and N/A, which will not fit
+   beside the label, and squeezing the label to fit is worse than a second line. */
 .task__head {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
   padding-right: 9px;
 }
+/* every control on the row, kept together so they wrap as one block */
+.task__tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  padding: 4px 0;
+}
 .task__row {
-  flex: 1 1 auto;
+  flex: 1 1 200px;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -365,29 +363,101 @@ body {
 }
 .task__note-btn:disabled { opacity: 0.55; cursor: default; }
 
-.task__notes {
-  padding: 0 var(--row-pad-x) 9px calc(var(--row-pad-x) + var(--box-size) + 10px);
+/* ---------- Counter ----------
+   Reads "7 / 15" with a tap target either side. The value is free to go past
+   the target, so nothing here clamps or recolours at the top end — the row's
+   done state is the only thing that changes. */
+.counter {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  background: var(--navy-2);
+  border-radius: 9px;
+  padding: 2px 4px;
 }
-
-/* Read-only mirror of another task's note. Same panel geometry and the same
-   sunken field surface as a real textarea, minus the caret — it should read as
-   information, not as somewhere to type. */
-.task__mirror-label {
-  margin: 0 0 5px;
+.counter__btn {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--orange);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.counter__btn:hover:not(:disabled) { background: var(--card); }
+.counter__btn:disabled { opacity: 0.4; cursor: default; }
+.counter__input {
+  width: 2.6ch;
+  min-width: 2.6ch;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.counter__input:disabled { opacity: 0.6; }
+.counter__target {
   font-size: 0.78rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  padding-right: 2px;
+}
+.task--done .counter { border-color: rgba(var(--green-rgb), .45); }
+.task--done .counter__input { color: var(--tint-green); }
+
+/* ---------- N/A ----------
+   Same chip geometry as the note button. Disabled is a real state here, not an
+   accident: on the two outreach rows the button exists to say the answer is no. */
+.na-btn {
+  flex: 0 0 auto;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--line);
+  background: var(--navy-2);
+  color: var(--ink-faint);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.na-btn:hover:not(:disabled) { border-color: var(--orange); color: var(--ink-dim); }
+.na-btn--on {
+  background: var(--card);
+  border-color: var(--ink-faint);
   color: var(--ink-dim);
 }
-.task__mirror-text {
+.na-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* the rollover explanation, under the row whose target it changed */
+.task__sub {
   margin: 0;
-  font-size: 0.875rem;
-  padding: 8px 11px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--navy-2);
-  color: var(--ink);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  padding: 0 var(--row-pad-x) 8px calc(var(--row-pad-x) + var(--box-size) + 10px);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--orange);
+}
+
+.task__notes {
+  padding: 0 var(--row-pad-x) 9px calc(var(--row-pad-x) + var(--box-size) + 10px);
 }
 
 /* ---------- Fields / notes ---------- */
@@ -484,6 +554,51 @@ body {
 #submitDone .card__title { color: var(--green); }
 .done__text { margin: 0; color: var(--ink-dim); font-size: 0.88rem; }
 
+/* ---------- Last 14 days ---------- */
+.tallies {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tally {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--navy-2);
+}
+.tally--flagged { border-color: rgba(var(--amber-rgb), .45); }
+.tally__name { font-size: 0.85rem; font-weight: 700; }
+.tally__meta {
+  font-size: 0.76rem;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* Amber, not red: a row you keep skipping is worth a look, not a telling-off. */
+.flag {
+  margin: 8px 0 0;
+  padding: 8px 11px;
+  border: 1px solid rgba(var(--amber-rgb), .4);
+  border-left: 4px solid var(--amber);
+  border-radius: 10px;
+  background: rgba(var(--amber-rgb), .1);
+  color: var(--tint-amber);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.tallies__foot {
+  margin: 9px 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+}
+
 /* ---------- Notes log ---------- */
 .log__head {
   display: flex;
@@ -537,4 +652,8 @@ body {
   .task__head { padding-right: 7px; }
   .task__row { padding-left: 9px; }
   .task__notes { padding-left: 9px; padding-right: 9px; }
+  .task__sub { padding-left: 9px; padding-right: 9px; }
+  /* Once the tools have wrapped onto their own line, left-aligning them under
+     the label reads better than stranding them against the right edge. */
+  .task__tools { margin-left: 0; padding-left: 9px; }
 }

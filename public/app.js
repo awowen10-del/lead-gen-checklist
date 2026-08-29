@@ -1,91 +1,185 @@
 "use strict";
 
-/* ---------------- Config ---------------- */
-/* Completion is keyed by these stable ids, never by position — reordering is
-   safe, but an id here must also exist in TASK_IDS in netlify/functions/api.mjs
-   or the server will silently drop its ticks. Labels are free to change: they
-   are display-only and no stored record references them.
+/* ---------------- Config ----------------
+   The list is three sections, and the sections — not the tasks — own the
+   scheduling. A task belongs to exactly one section and inherits its days,
+   which is what lets Thursday swap the whole tail out for a single job
+   without any per-task special-casing.
 
-   `notes` gives a task its own collapsible note. `field` is the day-record
-   field the text is stored in and must also exist in NOTE_FIELDS in
-   netlify/functions/api.mjs, or the note will save to nothing.
+   Completion is keyed by stable ids, never by position — reordering is safe,
+   but an id here must also exist in TASK_IDS in netlify/functions/api.mjs or
+   the server will silently drop its ticks. Labels are free to change: they are
+   display-only and no stored record references them. Ids are deliberately
+   unchanged from earlier versions of the list even where the wording has moved
+   on ("clients" is the Trainerize dip, "texts" is messaging new leads), so
+   every day already stored still reads back against the right row.
 
-   `link` is one chip or an array of them; they render in the order given.
-   Keep the text short — chips sit on the task row and must not wrap.
+   Per task:
+     kind    "check" (a tick) or "count" (a number with a target).
+     target  count tasks only — the number that marks the row done.
+     link    one chip or an array of them, rendered in the order given.
+             Keep the text short; chips sit on the task row.
+     notes   gives the task its own collapsible note. `field` is the day-record
+             field the text is stored in and must also exist in NOTE_FIELDS in
+             netlify/functions/api.mjs, or the note will save to nothing.
+     na      whether the row can be marked N/A. false renders the button
+             disabled with `naHint` as its tooltip rather than hiding it — the
+             point is that the answer is visibly "no", not that the option is
+             missing.
+     short   the name used in the 14-day panel, where the full label is too long.
 
-   `mirror` shows ANOTHER task's note here, read-only. It reads an existing
-   field and writes nothing, so it adds no field to the day record.
+   Sections carry `days` as JS day numbers (0 = Sunday … 6 = Saturday). The
+   weekday always comes from currentDate, never a fresh Date(), so the rows on
+   screen match the date in the header even after a rollover with the tab open. */
+const SUN = 0, MON = 1, TUE = 2, WED = 3, THU = 4, FRI = 5, SAT = 6;
+const EVERY_DAY = [SUN, MON, TUE, WED, THU, FRI, SAT];
+const EXCEPT_THU = EVERY_DAY.filter((d) => d !== THU);
 
-   `days` limits a task to certain weekdays, as an array of JS day numbers
-   (0 = Sunday … 6 = Saturday). Absent means every day. The weekday comes from
-   currentDate, never a fresh Date(), so the rows on screen always match the
-   date in the header — including after a rollover while the tab sat open.
+/* Both non-N/A-able rows share one explanation, and it is the reason they are
+   not N/A-able: the work is never genuinely unavailable. */
+const NA_LOCKED_HINT = "There's always someone to message.";
 
-   Array order IS the display order, and it is deliberate: check-ins sit
-   immediately before content because the wins captured there are the material
-   for the day's stories, and the Thursday email sits with content because it
-   is the same job — this week's message — in another channel. Reordering is
-   safe — nothing stored references position — but keep those runs together. */
-
-/* JS getDay() numbers, named so the TASKS entries below read as English. */
-const THU = 4;
-
-const TASKS = [
-  { id: "texts", label: "Message new leads", link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" } },
-  { id: "leads", label: "Follow up leads that are parked or have been quiet for 2 weeks" },
+const SECTIONS = [
   {
-    id: "dm",
-    label: "DM outreach",
-    link: [
-      { url: "https://www.instagram.com", text: "Instagram ↗" },
-      { url: "https://business.facebook.com/latest/inbox/all", text: "Meta Inbox ↗" },
+    id: "hour",
+    title: "The hour",
+    time: "9:00 – 10:00",
+    days: EVERY_DAY,
+    tasks: [
+      {
+        id: "texts",
+        short: "New leads",
+        label: "Message new leads",
+        kind: "check",
+        na: true,
+        link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" },
+      },
+      {
+        id: "leads",
+        short: "Parked leads",
+        label: "Follow up parked / quiet leads (2+ weeks)",
+        kind: "count",
+        target: 10,
+        na: false,
+        naHint: NA_LOCKED_HINT,
+      },
+      {
+        id: "dm",
+        short: "DM outreach",
+        label: "DM outreach",
+        kind: "count",
+        target: 15,
+        na: false,
+        naHint: NA_LOCKED_HINT,
+        link: [
+          { url: "https://www.instagram.com", text: "Instagram ↗" },
+          { url: "https://business.facebook.com/latest/inbox/all", text: "Meta Inbox ↗" },
+        ],
+      },
     ],
   },
   {
-    id: "ads",
-    label: "Review ad performance",
-    link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" },
-    notes: { field: "adsNotes", placeholder: "Ad notes…", title: "Ad notes" },
+    /* The ordinary tail. Thursday gets the section below instead — the two are
+       mutually exclusive by construction, since their `days` do not overlap. */
+    id: "tail",
+    title: "The tail",
+    time: "10:00 – 10:15",
+    days: EXCEPT_THU,
+    tasks: [
+      {
+        id: "content",
+        short: "Publish content",
+        label: "Publish scheduled content",
+        kind: "check",
+        na: true,
+        link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" },
+      },
+      {
+        id: "clients",
+        short: "Trainerize dip",
+        label: "Trainerize dip (10 min cap)",
+        kind: "check",
+        na: true,
+        link: { url: "https://bodysculpt4.trainerize.com/app/overview", text: "Trainerize ↗" },
+        notes: {
+          field: "clientNotes",
+          placeholder: "Wins, quotes, transformations — anything worth posting",
+          title: "Check-in notes",
+        },
+      },
+      {
+        id: "onboarding",
+        short: "Onboarding",
+        label: "Onboarding tracker — welcome cards etc",
+        kind: "check",
+        na: true,
+        link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" },
+      },
+    ],
   },
   {
-    id: "clients",
-    label: "Check in with clients",
-    link: { url: "https://bodysculpt4.trainerize.com/app/overview", text: "Trainerize ↗" },
-    notes: {
-      field: "clientNotes",
-      placeholder: "Wins, quotes, transformations — anything worth posting",
-      title: "Check-in notes",
-    },
-  },
-  {
-    id: "content",
-    label: "Post content / stories",
-    link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" },
-    mirror: { field: "clientNotes", title: "Today's check-in wins" },
-  },
-  {
-    id: "email",
-    label: "Marketing email to prospects and suspects",
+    /* Thursday's tail is one job, not three. The email IS the tail that day. */
+    id: "tail-thu",
+    title: "The tail",
+    time: "10:00 – 10:15",
     days: [THU],
-    notes: {
-      field: "emailNotes",
-      placeholder: "Angle, subject line, what you sent…",
-      title: "Email notes",
-    },
+    tasks: [
+      {
+        id: "email",
+        short: "Thursday email",
+        label: "Write and schedule the email",
+        kind: "check",
+        na: true,
+        link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" },
+      },
+    ],
   },
-  { id: "onboarding", label: "Check onboarding tracker for any outstanding jobs", link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" } },
+  {
+    id: "weekly",
+    title: "Twice weekly",
+    time: "Mon and Thu",
+    days: [MON, THU],
+    tasks: [
+      {
+        id: "ads",
+        short: "Ad review",
+        label: "Review ad performance",
+        kind: "check",
+        na: true,
+        link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" },
+        notes: { field: "adsNotes", placeholder: "Ad notes…", title: "Ad notes" },
+      },
+    ],
+  },
 ];
 
-/* Every free-text field the day record carries, derived from TASKS so adding a
-   note to a task is a one-line change. Save, restore and exit-flush all iterate
-   this — none of them names a field directly. */
-const NOTE_FIELDS = TASKS.filter((t) => t.notes).map((t) => t.notes.field);
+/* Flat views of the config. ALL_TASKS is the schema — every id and note field
+   that can ever exist — as distinct from the tasks that apply to a given day. */
+const ALL_TASKS = SECTIONS.flatMap((s) => s.tasks);
+const NOTE_FIELDS = ALL_TASKS.filter((t) => t.notes).map((t) => t.notes.field);
+const COUNT_TASKS = ALL_TASKS.filter((t) => t.kind === "count");
+
+/* Rollover: no new leads to message means that time goes into outreach, so the
+   DM target rises. One rule, declared once, read by both the target lookup and
+   the line that explains itself under the row. */
+const ROLLOVER = {
+  when: "texts",      // this task marked N/A…
+  raises: "dm",       // …raises this task's target…
+  to: 20,             // …to this.
+  note: "No new leads today. Time rolls into outreach.",
+};
 
 const NOTES_DEBOUNCE_MS = 600;
+const COUNT_DEBOUNCE_MS = 400; // shorter: a run of + taps should land quickly
+const MAX_COUNT = 999;
+const RECENT_DAYS = 14;
+const NA_FLAG_THRESHOLD = 3; // N/A this often in the window and the panel says so
+const ROLLOVER_POLL_MS = 30000;
 
-const emptyChecked = () => Object.fromEntries(TASKS.map((t) => [t.id, false]));
 const emptyState = () => ({
-  checked: emptyChecked(),
+  checked: {},
+  counts: {},
+  na: {},
   submitted: false,
   ...Object.fromEntries(NOTE_FIELDS.map((f) => [f, ""])),
 });
@@ -104,13 +198,14 @@ let loaded = false;
    successful write — never a whole day record. It is the payload source for
    every save, which is what makes a default/empty write structurally
    impossible rather than merely guarded against. */
-let pending = { checked: {} };
+let pending = { checked: {}, counts: {}, na: {} };
 let inFlight = false;
 let saveTimer = null;
 let savedFlashTimer = null;
 
 let lastSavedNotes = null; // snapshot of last notes saved to the log
 let logLoaded = false;
+let recentLoaded = false;
 let notesOpen = {}; // task id → whether its collapsible note panel is expanded
 
 /* ---------------- Date helpers ----------------
@@ -123,22 +218,19 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/* The weekday of a YYYY-MM-DD key, parsed as local time for the same reason
-   todayStr() is local-only: constructing from the parts avoids the UTC shift
-   that Date(iso) would apply and that would land Thursday's task on Wednesday
-   evening for anyone west of UTC. */
+/* A YYYY-MM-DD key `back` days before today, for walking the 14-day window. */
+function dateStr(back) {
+  const d = new Date();
+  d.setDate(d.getDate() - back);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/* Parsed from the parts, never new Date(iso): the string form is treated as UTC
+   and would shift the weekday backwards for anyone west of UTC, landing
+   Thursday's list on Wednesday evening. */
 function weekdayOf(iso) {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d).getDay();
-}
-
-/* The tasks that apply to the day being shown. This is the list for EVERY
-   user-facing purpose — rendering, the count, the progress bar — so a task
-   that isn't on today's list cannot silently hold the bar back. TASKS itself
-   stays the full set: it is the schema (ids, note fields), not the day. */
-function visibleTasks() {
-  const dow = weekdayOf(currentDate);
-  return TASKS.filter((t) => !t.days || t.days.includes(dow));
 }
 
 function prettyDate(iso) {
@@ -146,6 +238,46 @@ function prettyDate(iso) {
   return new Date(y, m - 1, d).toLocaleDateString("en-GB", {
     weekday: "short", day: "numeric", month: "short",
   });
+}
+
+/* ---------------- Which tasks apply to a day ----------------
+   One pair of functions answers this for ANY date, not just today, because the
+   14-day panel has to know whether a task was even on the list on a past date
+   before it can say anything about how often it was skipped. */
+function sectionsFor(iso) {
+  const dow = weekdayOf(iso);
+  return SECTIONS.filter((s) => s.days.includes(dow));
+}
+
+function tasksFor(iso) {
+  return sectionsFor(iso).flatMap((s) => s.tasks);
+}
+
+function visibleTasks() {
+  return tasksFor(currentDate);
+}
+
+/* The target a count task has TODAY, which is not always its configured one —
+   see ROLLOVER. Everything that needs a target reads it through here. */
+function targetFor(task) {
+  if (task.id === ROLLOVER.raises && state.na[ROLLOVER.when]) return ROLLOVER.to;
+  return task.target;
+}
+
+function countOf(id) {
+  return Number(state.counts[id]) || 0;
+}
+
+/* An N/A row is neither done nor outstanding — it is off the list, so it is
+   false here AND absent from the denominator in renderProgress. */
+function isDone(task) {
+  if (state.na[task.id]) return false;
+  if (task.kind === "count") return countOf(task.id) >= targetFor(task);
+  return !!state.checked[task.id];
+}
+
+function activeTasks() {
+  return visibleTasks().filter((t) => !state.na[t.id]);
 }
 
 /* ---------------- API ---------------- */
@@ -201,13 +333,23 @@ function setSaveState(kind) {
 }
 
 /* ---------------- Autosave ----------------
-   Ticks save immediately — they are single, deliberate actions and there is
-   nothing to coalesce. Only free-text typing is debounced. */
-function queueChecked(id, value) {
-  pending.checked[id] = value;
+   Ticks and N/A save immediately — they are single, deliberate actions and
+   there is nothing to coalesce. Typing is debounced, and so are counters,
+   which are tapped in runs. */
+function queueMap(map, id, value) {
+  pending[map][id] = value;
   clearTimeout(saveTimer);
   saveTimer = null;
   pushState();
+}
+
+function queueChecked(id, value) { queueMap("checked", id, value); }
+function queueNa(id, value) { queueMap("na", id, value); }
+
+function queueCount(id, value) {
+  pending.counts[id] = value;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(pushState, COUNT_DEBOUNCE_MS);
 }
 
 function queueNote(field, value) {
@@ -219,6 +361,8 @@ function queueNote(field, value) {
 function hasPending() {
   return (
     Object.keys(pending.checked).length > 0 ||
+    Object.keys(pending.counts).length > 0 ||
+    Object.keys(pending.na).length > 0 ||
     NOTE_FIELDS.some((f) => f in pending)
   );
 }
@@ -228,7 +372,9 @@ function hasPending() {
    sent. Only changed fields are included; absent means "leave alone" server-side. */
 function buildPayload() {
   const payload = { date: currentDate };
-  if (Object.keys(pending.checked).length) payload.checked = { ...pending.checked };
+  for (const map of ["checked", "counts", "na"]) {
+    if (Object.keys(pending[map]).length) payload[map] = { ...pending[map] };
+  }
   for (const f of NOTE_FIELDS) {
     if (f in pending) payload[f] = pending[f];
   }
@@ -238,16 +384,17 @@ function buildPayload() {
 function takePending() {
   if (!hasPending()) return null;
   const payload = buildPayload();
-  pending = { checked: {} };
+  pending = { checked: {}, counts: {}, na: {} };
   return payload;
 }
 
 /* Put a failed payload back so nothing is lost, without clobbering anything the
    user has changed since — newer edits always win. */
 function restorePending(payload) {
-  if (payload.checked) {
-    for (const [id, v] of Object.entries(payload.checked)) {
-      if (!(id in pending.checked)) pending.checked[id] = v;
+  for (const map of ["checked", "counts", "na"]) {
+    if (!payload[map]) continue;
+    for (const [id, v] of Object.entries(payload[map])) {
+      if (!(id in pending[map])) pending[map][id] = v;
     }
   }
   for (const f of NOTE_FIELDS) {
@@ -275,6 +422,7 @@ async function pushState() {
     ok = true;
     setSaveState("saved");
     clearError();
+    recentLoaded = false; // the 14-day panel is now one edit out of date
   } catch (e) {
     restorePending(payload);
     setSaveState("error");
@@ -322,194 +470,286 @@ function inputsDisabled() {
   return state.submitted || !loaded;
 }
 
+function chip(className, text) {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = className;
+  el.textContent = text;
+  return el;
+}
+
 function renderTasks() {
-  const list = document.getElementById("taskList");
-  list.innerHTML = "";
-  for (const task of visibleTasks()) {
-    const li = document.createElement("li");
-    li.className = "task" + (state.checked[task.id] ? " task--done" : "");
-    li.dataset.id = task.id;
+  const host = document.getElementById("taskList");
+  host.innerHTML = "";
+  for (const section of sectionsFor(currentDate)) {
+    host.append(renderSection(section));
+  }
+}
 
-    // head holds everything that must stay one uniform row height
-    const head = document.createElement("div");
-    head.className = "task__head";
+function renderSection(section) {
+  const wrap = document.createElement("section");
+  wrap.className = "section";
 
-    const row = document.createElement("label");
-    row.className = "task__row";
+  const head = document.createElement("div");
+  head.className = "section__head";
+  const title = document.createElement("h3");
+  title.className = "section__title";
+  title.textContent = section.title;
+  const time = document.createElement("span");
+  time.className = "section__time";
+  time.textContent = section.time;
+  head.append(title, time);
 
+  const list = document.createElement("ul");
+  list.className = "tasks";
+  for (const task of section.tasks) list.append(renderTask(task));
+
+  wrap.append(head, list);
+  return wrap;
+}
+
+function renderTask(task) {
+  const na = !!state.na[task.id];
+  const done = isDone(task);
+
+  const li = document.createElement("li");
+  li.className = "task" + (done ? " task--done" : "") + (na ? " task--na" : "");
+  li.dataset.id = task.id;
+
+  // head holds everything that must stay one uniform row height; on a narrow
+  // screen the tools wrap beneath the label rather than squeezing it.
+  const head = document.createElement("div");
+  head.className = "task__head";
+
+  // A tickable row is a <label> so the whole thing is a hit target. A counter
+  // row is not — there is no checkbox to toggle, and wrapping the counter in a
+  // label would make every + tap also activate the label.
+  const row = document.createElement(task.kind === "count" ? "div" : "label");
+  row.className = "task__row";
+
+  const box = document.createElement("span");
+  box.className = "task__box";
+  box.textContent = "✓";
+  box.setAttribute("aria-hidden", "true");
+
+  const label = document.createElement("span");
+  label.className = "task__label";
+  label.textContent = task.label;
+
+  if (task.kind === "check") {
     const input = document.createElement("input");
     input.type = "checkbox";
     input.checked = !!state.checked[task.id];
-    input.disabled = inputsDisabled();
+    input.disabled = inputsDisabled() || na;
     input.addEventListener("change", () => {
       state.checked[task.id] = input.checked;
-      li.classList.toggle("task--done", input.checked);
+      li.classList.toggle("task--done", isDone(task));
       renderProgress();
       queueChecked(task.id, input.checked);
     });
-
-    const box = document.createElement("span");
-    box.className = "task__box";
-    box.textContent = "✓";
-    box.setAttribute("aria-hidden", "true");
-
-    const label = document.createElement("span");
-    label.className = "task__label";
-    label.textContent = task.label;
-
-    row.append(input, box, label);
-    head.append(row);
-
-    // One chip or several — a lone object is treated as a list of one so the
-    // common single-link case stays a plain object in TASKS.
-    for (const link of [].concat(task.link || [])) {
-      const a = document.createElement("a");
-      a.className = "task__link";
-      a.href = link.url;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.textContent = link.text;
-      head.append(a);
-    }
-
-    li.append(head);
-
-    if (task.notes) {
-      const field = task.notes.field;
-      const panelId = `taskNotes-${task.id}`;
-      const open = !!notesOpen[task.id];
-
-      const wrap = document.createElement("div");
-      wrap.className = "task__notes";
-      wrap.id = panelId;
-      wrap.hidden = !open;
-
-      const ta = document.createElement("textarea");
-      ta.className = "field__input field__input--small";
-      ta.id = `note-${task.id}`;
-      ta.rows = 2;
-      ta.placeholder = task.notes.placeholder;
-      ta.value = state[field] || "";
-      ta.disabled = inputsDisabled();
-      wrap.append(ta);
-
-      // small affordance in the row; keeps every row the same height
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      toggle.className =
-        "task__note-btn" + (ta.value.trim() ? " task__note-btn--filled" : "");
-      toggle.textContent = "Note";
-      toggle.title = task.notes.title;
-      toggle.setAttribute("aria-label", task.notes.title);
-      toggle.setAttribute("aria-expanded", String(open));
-      toggle.setAttribute("aria-controls", panelId);
-
-      ta.addEventListener("input", () => {
-        state[field] = ta.value;
-        toggle.classList.toggle("task__note-btn--filled", ta.value.trim() !== "");
-        syncMirrors();
-        queueNote(field, ta.value);
-      });
-      toggle.addEventListener("click", () => {
-        const next = !notesOpen[task.id];
-        notesOpen[task.id] = next;
-        wrap.hidden = !next;
-        toggle.setAttribute("aria-expanded", String(next));
-        if (next) ta.focus();
-      });
-
-      head.append(toggle);
-      li.append(wrap);
-    }
-
-    /* Read-only view of another task's note, so the wins captured during
-       check-ins are in front of you while posting instead of a scroll away.
-       Nothing here is editable and nothing is saved — the source textarea on
-       the check-in task remains the only writer of the field. Empty source
-       means no panel and no button at all, not an empty box. */
-    if (task.mirror) {
-      const panelId = `taskMirror-${task.id}`;
-      const text = (state[task.mirror.field] || "").trim();
-      const open = !!notesOpen[task.id];
-
-      const wrap = document.createElement("div");
-      wrap.className = "task__notes";
-      wrap.id = panelId;
-      wrap.hidden = !open || !text;
-
-      const heading = document.createElement("p");
-      heading.className = "task__mirror-label";
-      heading.textContent = task.mirror.title;
-
-      const body = document.createElement("p");
-      body.className = "task__mirror-text";
-      body.textContent = text;
-
-      wrap.append(heading, body);
-
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      // Always "filled": the button only ever exists when there is something
-      // to read, so the accent is the honest state.
-      toggle.className = "task__note-btn task__note-btn--filled";
-      toggle.id = `mirrorBtn-${task.id}`;
-      toggle.textContent = "Wins";
-      toggle.title = task.mirror.title;
-      toggle.setAttribute("aria-label", task.mirror.title);
-      toggle.setAttribute("aria-expanded", String(open && !!text));
-      toggle.setAttribute("aria-controls", panelId);
-      toggle.hidden = !text;
-
-      toggle.addEventListener("click", () => {
-        const next = !notesOpen[task.id];
-        notesOpen[task.id] = next;
-        wrap.hidden = !next;
-        toggle.setAttribute("aria-expanded", String(next));
-      });
-
-      head.append(toggle);
-      li.append(wrap);
-    }
-
-    list.append(li);
+    row.append(input);
   }
+  row.append(box, label);
+  head.append(row);
+
+  /* The head goes into the row NOW, before anything below adds to it. The note
+     panel and the rollover line are children of the <li>, not of the head, and
+     they must come after it — so the head has to be appended first and then
+     mutated in place, rather than assembled and appended last. */
+  li.append(head);
+
+  const tools = document.createElement("div");
+  tools.className = "task__tools";
+  head.append(tools);
+
+  /* The rollover only ever explains itself on the row it actually changed, and
+     only while it is in force. */
+  if (task.id === ROLLOVER.raises && state.na[ROLLOVER.when]) {
+    const sub = document.createElement("p");
+    sub.className = "task__sub";
+    sub.textContent = ROLLOVER.note;
+    li.append(sub);
+  }
+
+  // One chip or several — a lone object is treated as a list of one so the
+  // common single-link case stays a plain object in the config.
+  for (const link of [].concat(task.link || [])) {
+    const a = document.createElement("a");
+    a.className = "task__link";
+    a.href = link.url;
+    a.target = "_blank";
+    a.rel = "noopener";
+    a.textContent = link.text;
+    tools.append(a);
+  }
+
+  if (task.kind === "count") tools.append(renderCounter(task, li));
+  if (task.notes) tools.append(renderNoteButton(task, li));
+  tools.append(renderNaButton(task));
+
+  return li;
 }
 
-/* Keep every mirror in step with its source as it is typed. This patches the
-   DOM in place rather than calling renderTasks(), which would rebuild the
-   textarea being typed into and take the caret with it. */
-function syncMirrors() {
-  for (const task of TASKS) {
-    if (!task.mirror) continue;
-    const wrap = document.getElementById(`taskMirror-${task.id}`);
-    const toggle = document.getElementById(`mirrorBtn-${task.id}`);
-    if (!wrap || !toggle) continue;
-    const text = (state[task.mirror.field] || "").trim();
-    const body = wrap.querySelector(".task__mirror-text");
-    if (body) body.textContent = text;
-    toggle.hidden = !text;
-    toggle.setAttribute("aria-expanded", String(!!text && !!notesOpen[task.id]));
-    wrap.hidden = !text || !notesOpen[task.id];
+/* A number, not a tick: the point is to log what was actually done, so the
+   value is stored as typed and is free to go past the target. Target only
+   decides when the row reads as done. */
+function renderCounter(task, li) {
+  const target = targetFor(task);
+  const wrap = document.createElement("div");
+  wrap.className = "counter";
+  wrap.setAttribute("role", "group");
+  wrap.setAttribute("aria-label", `${task.label} — count out of ${target}`);
+
+  const dec = chip("counter__btn", "−");
+  dec.setAttribute("aria-label", `One fewer on ${task.label}`);
+  const inc = chip("counter__btn", "+");
+  inc.setAttribute("aria-label", `One more on ${task.label}`);
+
+  // text + inputmode rather than type=number: the numeric keypad without the
+  // spinner arrows, which would sit right beside our own + and −.
+  const input = document.createElement("input");
+  input.className = "counter__input";
+  input.type = "text";
+  input.inputMode = "numeric";
+  input.autocomplete = "off";
+  input.value = String(countOf(task.id));
+  input.setAttribute("aria-label", `${task.label} count`);
+
+  const of = document.createElement("span");
+  of.className = "counter__target";
+  of.textContent = `/ ${target}`;
+
+  const disabled = inputsDisabled() || !!state.na[task.id];
+  dec.disabled = disabled;
+  inc.disabled = disabled;
+  input.disabled = disabled;
+
+  /* Applied in place rather than through renderAll(): a re-render would
+     rebuild the input mid-edit and take the caret with it. */
+  const apply = (n, writeBack) => {
+    const v = Math.max(0, Math.min(MAX_COUNT, Math.round(n) || 0));
+    state.counts[task.id] = v;
+    if (writeBack) input.value = String(v);
+    li.classList.toggle("task--done", isDone(task));
+    renderProgress();
+    queueCount(task.id, v);
+  };
+
+  dec.addEventListener("click", () => apply(countOf(task.id) - 1, true));
+  inc.addEventListener("click", () => apply(countOf(task.id) + 1, true));
+  input.addEventListener("input", () => {
+    // Strip as you type, but do not write the value back into the field mid-edit
+    // — that would fight the caret. The blur below normalises it.
+    apply(parseInt(input.value.replace(/[^0-9]/g, ""), 10) || 0, false);
+  });
+  input.addEventListener("blur", () => { input.value = String(countOf(task.id)); });
+
+  wrap.append(dec, input, of, inc);
+  return wrap;
+}
+
+/* Builds both halves of the note affordance and returns only the button: the
+   collapsible panel is appended straight onto the <li>, because the two live in
+   different parents — the button belongs in the tools row, the panel below it. */
+function renderNoteButton(task, li) {
+  const field = task.notes.field;
+  const panelId = `taskNotes-${task.id}`;
+  const open = !!notesOpen[task.id];
+
+  const wrap = document.createElement("div");
+  wrap.className = "task__notes";
+  wrap.id = panelId;
+  wrap.hidden = !open;
+
+  const ta = document.createElement("textarea");
+  ta.className = "field__input field__input--small";
+  ta.id = `note-${task.id}`;
+  ta.rows = 2;
+  ta.placeholder = task.notes.placeholder;
+  ta.value = state[field] || "";
+  ta.disabled = inputsDisabled();
+  wrap.append(ta);
+  li.append(wrap);
+
+  const toggle = chip(
+    "task__note-btn" + (ta.value.trim() ? " task__note-btn--filled" : ""),
+    "Note"
+  );
+  toggle.title = task.notes.title;
+  toggle.setAttribute("aria-label", task.notes.title);
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-controls", panelId);
+
+  ta.addEventListener("input", () => {
+    state[field] = ta.value;
+    toggle.classList.toggle("task__note-btn--filled", ta.value.trim() !== "");
+    queueNote(field, ta.value);
+  });
+  toggle.addEventListener("click", () => {
+    const next = !notesOpen[task.id];
+    notesOpen[task.id] = next;
+    wrap.hidden = !next;
+    toggle.setAttribute("aria-expanded", String(next));
+    if (next) ta.focus();
+  });
+
+  return toggle;
+}
+
+/* N/A takes the row off today's list entirely — greyed, not counted, and
+   recorded so the 14-day panel can point out a row you keep skipping.
+
+   On the two outreach rows the button is rendered DISABLED rather than omitted.
+   Leaving it out would read as an oversight; leaving it in, greyed, with the
+   reason on it, says the answer is no on purpose. */
+function renderNaButton(task) {
+  const na = !!state.na[task.id];
+  const btn = chip("na-btn" + (na ? " na-btn--on" : ""), "N/A");
+  btn.setAttribute("aria-pressed", String(na));
+
+  if (!task.na) {
+    btn.disabled = true;
+    btn.title = task.naHint;
+    btn.setAttribute("aria-label", `N/A unavailable — ${task.naHint}`);
+    return btn;
   }
+
+  btn.disabled = inputsDisabled();
+  btn.title = na ? `${task.label} — marked N/A today` : `Mark "${task.label}" N/A today`;
+  btn.setAttribute("aria-label", btn.title);
+  btn.addEventListener("click", () => {
+    const next = !state.na[task.id];
+    state.na[task.id] = next;
+    queueNa(task.id, next);
+    /* A full re-render, not a class toggle: N/A on one row can change another
+       row's target (the rollover), which changes its label, its done state and
+       the denominator. Cheap, and there is no caret to lose — the press has
+       already moved focus off any field. */
+    renderAll();
+  });
+  return btn;
 }
 
 function renderProgress() {
-  const tasks = visibleTasks();
-  const total = tasks.length;
-  const done = tasks.filter((t) => state.checked[t.id]).length;
-  document.getElementById("taskCount").textContent = `${done}/${total} done`;
+  const active = activeTasks();
+  const total = active.length;
+  const done = active.filter(isDone).length;
+  const naCount = visibleTasks().length - total;
+
+  document.getElementById("taskCount").textContent =
+    `${done}/${total} done${naCount ? ` · ${naCount} N/A` : ""}`;
   document.getElementById("progressLabel").textContent = `${done} of ${total} done`;
+
   const fill = document.getElementById("progressFill");
-  fill.style.width = `${(done / total) * 100}%`;
-  fill.classList.toggle("progressbar__fill--full", done === total);
+  const pct = total ? (done / total) * 100 : 0;
+  fill.style.width = `${pct}%`;
+  fill.classList.toggle("progressbar__fill--full", total > 0 && done === total);
 }
 
 function renderSubmitState() {
   document.getElementById("submitPending").hidden = state.submitted;
   document.getElementById("submitDone").hidden = !state.submitted;
   document.getElementById("submitBtn").disabled = !loaded;
-  document.querySelectorAll("#taskList input").forEach((el) => (el.disabled = inputsDisabled()));
-  document.querySelectorAll("#taskList textarea").forEach((el) => (el.disabled = inputsDisabled()));
 }
 
 function renderAll() {
@@ -520,10 +760,9 @@ function renderAll() {
 }
 
 /* ---------------- Notes log ----------------
-   Called only on submit now that the day-notes card is gone: it captures the
-   day's client check-in notes into the persistent log. Task notes themselves
-   live in the day record and are saved by the autosave path above — this is
-   only the log copy. */
+   Captures the day's Trainerize check-in notes into the persistent log on
+   submit. Task notes themselves live in the day record and are saved by the
+   autosave path above — this is only the log copy. */
 async function saveNotes() {
   const clients = (state.clientNotes || "").trim();
   if (!clients) return;
@@ -571,7 +810,7 @@ async function loadLog() {
         p.className = "log__note";
         const tag = document.createElement("span");
         tag.className = "log__tag";
-        tag.textContent = "Client check-ins: ";
+        tag.textContent = "Check-in notes: ";
         p.append(tag, document.createTextNode(entry.clients));
         li.append(p);
       }
@@ -583,26 +822,103 @@ async function loadLog() {
   }
 }
 
+/* ---------------- Last 14 days ----------------
+   Reads the stored day records straight back and tallies them. The denominator
+   is "days this task was actually on the list AND you opened the app", which is
+   why it re-derives the schedule for each past date rather than assuming every
+   task existed every day: N/A'ing the ad review twice out of the four Mondays
+   and Thursdays in a fortnight is a very different signal from twice out of
+   fourteen, and only the schedule knows which it is. */
+function tallyRecent(days) {
+  const byDate = Object.fromEntries(days.map((d) => [d.date, d]));
+  const rows = [];
+  for (const task of ALL_TASKS) {
+    let occasions = 0, naCount = 0, countSum = 0, countDays = 0;
+    for (let i = 0; i < RECENT_DAYS; i++) {
+      const iso = dateStr(i);
+      const rec = byDate[iso];
+      if (!rec) continue; // app never opened that day — not a skip, just no data
+      if (!tasksFor(iso).some((t) => t.id === task.id)) continue; // not on the list
+      occasions++;
+      if (rec.na && rec.na[task.id]) {
+        naCount++;
+        continue; // an N/A day has no count to average
+      }
+      if (task.kind === "count") {
+        countSum += Number((rec.counts || {})[task.id]) || 0;
+        countDays++;
+      }
+    }
+    if (!occasions) continue;
+    rows.push({
+      task,
+      occasions,
+      naCount,
+      avg: countDays ? countSum / countDays : null,
+    });
+  }
+  return rows;
+}
+
+async function loadRecent() {
+  const list = document.getElementById("recentList");
+  const empty = document.getElementById("recentEmpty");
+  const flags = document.getElementById("recentFlags");
+  try {
+    const { days } = await api(`recent?days=${RECENT_DAYS}`);
+    const rows = tallyRecent(days || []);
+    list.innerHTML = "";
+    flags.innerHTML = "";
+    empty.hidden = rows.length > 0;
+
+    for (const row of rows.filter((r) => r.naCount >= NA_FLAG_THRESHOLD)) {
+      const p = document.createElement("p");
+      p.className = "flag";
+      p.textContent = `${row.task.short}: N/A ${row.naCount} times. Pipeline gap?`;
+      flags.append(p);
+    }
+
+    for (const row of rows) {
+      const li = document.createElement("li");
+      li.className = "tally" + (row.naCount >= NA_FLAG_THRESHOLD ? " tally--flagged" : "");
+
+      const name = document.createElement("span");
+      name.className = "tally__name";
+      name.textContent = row.task.short;
+
+      const meta = document.createElement("span");
+      meta.className = "tally__meta";
+      const bits = [`N/A ${row.naCount} of ${row.occasions}`];
+      if (row.avg !== null) {
+        bits.push(`avg ${row.avg.toFixed(1)} / ${row.task.target}`);
+      }
+      meta.textContent = bits.join(" · ");
+
+      li.append(name, meta);
+      list.append(li);
+    }
+    recentLoaded = true;
+  } catch (e) {
+    showError(`Couldn't load the last 14 days: ${e.message}`);
+  }
+}
+
 /* ---------------- Submit ---------------- */
 async function submitDay() {
   const btn = document.getElementById("submitBtn");
   btn.disabled = true;
   btn.textContent = "Submitting…";
   try {
-    await pushState(); // flush any pending tick/notes changes first
+    await pushState(); // flush any pending tick/count/note changes first
     await saveNotes(); // capture today's check-in notes in the log
-    /* The server still keeps its `history` map — it is the record of which
-       days were submitted, and /api/submit returns it — but nothing on this
-       page reads it any more: the streak, month count and week dots are gone
-       deliberately. The response is ignored rather than the route changed, so
-       the record stays intact if it is ever wanted again. */
     await api("submit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: currentDate }),
     });
     state.submitted = true;
-    renderSubmitState();
+    recentLoaded = false;
+    renderAll();
     clearError();
   } catch (e) {
     showError(`Couldn't submit: ${e.message}`);
@@ -617,7 +933,14 @@ async function load() {
   currentDate = todayStr();
   try {
     const data = await api(`state?date=${currentDate}`);
-    state = { ...state, ...data.day, checked: { ...emptyChecked(), ...data.day.checked } };
+    const day = data.day || {};
+    state = {
+      ...state,
+      ...day,
+      checked: { ...(day.checked || {}) },
+      counts: { ...(day.counts || {}) },
+      na: { ...(day.na || {}) },
+    };
     loaded = true;
     hideLoadBlocker();
     clearError();
@@ -631,6 +954,23 @@ async function load() {
   renderAll();
 }
 
+/* A new day is a clean sheet in memory before the fetch, so nothing from
+   yesterday can survive into today's record even if the load then fails. */
+function startNewDay() {
+  state = emptyState();
+  pending = { checked: {}, counts: {}, na: {} };
+  notesOpen = {};
+  recentLoaded = false;
+  load();
+}
+
+/* Midnight rollover for a tab that is simply left open — the visibilitychange
+   handler below only fires on a return to the page, and this list is meant to
+   be sitting there at 9am on the day it belongs to. */
+setInterval(() => {
+  if (todayStr() !== currentDate) startNewDay();
+}, ROLLOVER_POLL_MS);
+
 // On re-focus: if the calendar day rolled over, start fresh; if there are
 // unsaved edits, push them rather than reloading over the top of them;
 // otherwise re-sync from the server (picks up another device, avoids stale
@@ -641,10 +981,7 @@ document.addEventListener("visibilitychange", () => {
     return;
   }
   if (todayStr() !== currentDate) {
-    state = emptyState();
-    pending = { checked: {} };
-    notesOpen = {};
-    load();
+    startNewDay();
   } else if (hasPending()) {
     pushState();
   } else if (!inFlight) {
@@ -656,54 +993,21 @@ document.addEventListener("visibilitychange", () => {
 // navigation, and iOS killing the page outright.
 window.addEventListener("pagehide", flushOnExit);
 
-/* ---------------- Light / dark theme ----------------
-   Inherited from the dashboard: same function names, same data-theme attribute
-   on <html>, same localStorage key ("bodysculpt:theme"), so a choice made on
-   either site is honoured by the other. Purely visual — no render path, no
-   data and no behaviour depends on it. The boot script in <head> applies the
-   stored value before the stylesheet parses; this only handles the toggle. */
-function bsTheme() {
-  try { return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; }
-  catch (e) { return "light"; }
-}
-function bsSetTheme(t) {
-  const next = t === "dark" ? "dark" : "light";
-  try { document.documentElement.setAttribute("data-theme", next); } catch (e) {}
-  try { localStorage.setItem("bodysculpt:theme", next); } catch (e) {}
-  // keep the iOS status bar in step with the page background
-  const meta = document.getElementById("themeColorMeta");
-  if (meta) meta.setAttribute("content", next === "dark" ? "#0f1b2d" : "#f2f4f8");
-  bsSyncThemeBtn();
-  return next;
-}
-function bsToggleTheme() { return bsSetTheme(bsTheme() === "dark" ? "light" : "dark"); }
-// The button offers the theme you'd switch TO, so its label always names the next state.
-function bsSyncThemeBtn() {
-  const b = document.getElementById("themeToggle");
-  if (!b) return;
-  const dark = bsTheme() === "dark";
-  b.textContent = dark ? "Light" : "Dark";
-  b.title = dark ? "Switch to the light theme" : "Switch to the dark theme";
-  b.setAttribute("aria-pressed", dark ? "true" : "false");
-}
-// Boot: the <head> script already applied the stored theme, so only the button
-// label and the status-bar colour need bringing into line on first paint.
-bsSyncThemeBtn();
-(function syncThemeColorOnBoot() {
-  const meta = document.getElementById("themeColorMeta");
-  if (meta) meta.setAttribute("content", bsTheme() === "dark" ? "#0f1b2d" : "#f2f4f8");
-})();
-
 /* ---------------- Wire up ---------------- */
+function wirePanel(btnId, panelId, onFirstOpen) {
+  document.getElementById(btnId).addEventListener("click", async (e) => {
+    const panel = document.getElementById(panelId);
+    const open = panel.hidden;
+    panel.hidden = !open;
+    e.target.textContent = open ? "Hide" : "Show";
+    e.target.setAttribute("aria-expanded", String(open));
+    if (open) await onFirstOpen();
+  });
+}
+
 document.getElementById("submitBtn").addEventListener("click", submitDay);
 document.getElementById("retryLoadBtn").addEventListener("click", load);
-document.getElementById("toggleLogBtn").addEventListener("click", async (e) => {
-  const panel = document.getElementById("logPanel");
-  const open = panel.hidden;
-  panel.hidden = !open;
-  e.target.textContent = open ? "Hide" : "Show";
-  e.target.setAttribute("aria-expanded", String(open));
-  if (open && !logLoaded) await loadLog();
-});
+wirePanel("toggleLogBtn", "logPanel", async () => { if (!logLoaded) await loadLog(); });
+wirePanel("toggleRecentBtn", "recentPanel", async () => { if (!recentLoaded) await loadRecent(); });
 
 load();
