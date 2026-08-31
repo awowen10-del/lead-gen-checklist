@@ -15,8 +15,6 @@
    every day already stored still reads back against the right row.
 
    Per task:
-     kind    "check" (a tick) or "count" (a number with a target).
-     target  count tasks only — the number that marks the row done.
      link    one chip or an array of them, rendered in the order given.
              Keep the text short; chips sit on the task row.
      notes   gives the task its own collapsible note. `field` is the day-record
@@ -50,7 +48,6 @@ const SECTIONS = [
         id: "texts",
         short: "New leads",
         label: "Message new leads",
-        kind: "check",
         na: true,
         link: { url: "https://salesfollowup-bodysculpt.netlify.app", text: "Follow-ups ↗" },
       },
@@ -58,8 +55,6 @@ const SECTIONS = [
         id: "leads",
         short: "Parked leads",
         label: "Follow up parked / quiet leads (2+ weeks)",
-        kind: "count",
-        target: 10,
         na: false,
         naHint: NA_LOCKED_HINT,
       },
@@ -67,8 +62,6 @@ const SECTIONS = [
         id: "dm",
         short: "DM outreach",
         label: "DM outreach",
-        kind: "count",
-        target: 15,
         na: false,
         naHint: NA_LOCKED_HINT,
         link: [
@@ -90,7 +83,6 @@ const SECTIONS = [
         id: "content",
         short: "Publish content",
         label: "Publish scheduled content",
-        kind: "check",
         na: true,
         link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" },
       },
@@ -98,7 +90,6 @@ const SECTIONS = [
         id: "clients",
         short: "Trainerize dip",
         label: "Trainerize dip (10 min cap)",
-        kind: "check",
         na: true,
         link: { url: "https://bodysculpt4.trainerize.com/app/overview", text: "Trainerize ↗" },
         notes: {
@@ -111,7 +102,6 @@ const SECTIONS = [
         id: "onboarding",
         short: "Onboarding",
         label: "Onboarding tracker — welcome cards etc",
-        kind: "check",
         na: true,
         link: { url: "https://bodysculpt-onboarding.netlify.app", text: "Onboarding ↗" },
       },
@@ -128,7 +118,6 @@ const SECTIONS = [
         id: "email",
         short: "Thursday email",
         label: "Write and schedule the email",
-        kind: "check",
         na: true,
         link: { url: "https://bodysculptcontent.netlify.app", text: "Content ↗" },
       },
@@ -144,7 +133,6 @@ const SECTIONS = [
         id: "ads",
         short: "Ad review",
         label: "Review ad performance",
-        kind: "check",
         na: true,
         link: { url: "https://bodysculpt-ad-intelligence.netlify.app", text: "Ad Intel ↗" },
         notes: { field: "adsNotes", placeholder: "Ad notes…", title: "Ad notes" },
@@ -157,28 +145,14 @@ const SECTIONS = [
    that can ever exist — as distinct from the tasks that apply to a given day. */
 const ALL_TASKS = SECTIONS.flatMap((s) => s.tasks);
 const NOTE_FIELDS = ALL_TASKS.filter((t) => t.notes).map((t) => t.notes.field);
-const COUNT_TASKS = ALL_TASKS.filter((t) => t.kind === "count");
-
-/* Rollover: no new leads to message means that time goes into outreach, so the
-   DM target rises. One rule, declared once, read by both the target lookup and
-   the line that explains itself under the row. */
-const ROLLOVER = {
-  when: "texts",      // this task marked N/A…
-  raises: "dm",       // …raises this task's target…
-  to: 20,             // …to this.
-  note: "No new leads today. Time rolls into outreach.",
-};
 
 const NOTES_DEBOUNCE_MS = 600;
-const COUNT_DEBOUNCE_MS = 400; // shorter: a run of + taps should land quickly
-const MAX_COUNT = 999;
 const RECENT_DAYS = 14;
 const NA_FLAG_THRESHOLD = 3; // N/A this often in the window and the panel says so
 const ROLLOVER_POLL_MS = 30000;
 
 const emptyState = () => ({
   checked: {},
-  counts: {},
   na: {},
   submitted: false,
   ...Object.fromEntries(NOTE_FIELDS.map((f) => [f, ""])),
@@ -198,7 +172,7 @@ let loaded = false;
    successful write — never a whole day record. It is the payload source for
    every save, which is what makes a default/empty write structurally
    impossible rather than merely guarded against. */
-let pending = { checked: {}, counts: {}, na: {} };
+let pending = { checked: {}, na: {} };
 let inFlight = false;
 let saveTimer = null;
 let savedFlashTimer = null;
@@ -257,22 +231,10 @@ function visibleTasks() {
   return tasksFor(currentDate);
 }
 
-/* The target a count task has TODAY, which is not always its configured one —
-   see ROLLOVER. Everything that needs a target reads it through here. */
-function targetFor(task) {
-  if (task.id === ROLLOVER.raises && state.na[ROLLOVER.when]) return ROLLOVER.to;
-  return task.target;
-}
-
-function countOf(id) {
-  return Number(state.counts[id]) || 0;
-}
-
 /* An N/A row is neither done nor outstanding — it is off the list, so it is
    false here AND absent from the denominator in renderProgress. */
 function isDone(task) {
   if (state.na[task.id]) return false;
-  if (task.kind === "count") return countOf(task.id) >= targetFor(task);
   return !!state.checked[task.id];
 }
 
@@ -334,8 +296,7 @@ function setSaveState(kind) {
 
 /* ---------------- Autosave ----------------
    Ticks and N/A save immediately — they are single, deliberate actions and
-   there is nothing to coalesce. Typing is debounced, and so are counters,
-   which are tapped in runs. */
+   there is nothing to coalesce. Only typing is debounced. */
 function queueMap(map, id, value) {
   pending[map][id] = value;
   clearTimeout(saveTimer);
@@ -346,12 +307,6 @@ function queueMap(map, id, value) {
 function queueChecked(id, value) { queueMap("checked", id, value); }
 function queueNa(id, value) { queueMap("na", id, value); }
 
-function queueCount(id, value) {
-  pending.counts[id] = value;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(pushState, COUNT_DEBOUNCE_MS);
-}
-
 function queueNote(field, value) {
   pending[field] = value;
   clearTimeout(saveTimer);
@@ -361,7 +316,6 @@ function queueNote(field, value) {
 function hasPending() {
   return (
     Object.keys(pending.checked).length > 0 ||
-    Object.keys(pending.counts).length > 0 ||
     Object.keys(pending.na).length > 0 ||
     NOTE_FIELDS.some((f) => f in pending)
   );
@@ -372,7 +326,7 @@ function hasPending() {
    sent. Only changed fields are included; absent means "leave alone" server-side. */
 function buildPayload() {
   const payload = { date: currentDate };
-  for (const map of ["checked", "counts", "na"]) {
+  for (const map of ["checked", "na"]) {
     if (Object.keys(pending[map]).length) payload[map] = { ...pending[map] };
   }
   for (const f of NOTE_FIELDS) {
@@ -384,14 +338,14 @@ function buildPayload() {
 function takePending() {
   if (!hasPending()) return null;
   const payload = buildPayload();
-  pending = { checked: {}, counts: {}, na: {} };
+  pending = { checked: {}, na: {} };
   return payload;
 }
 
 /* Put a failed payload back so nothing is lost, without clobbering anything the
    user has changed since — newer edits always win. */
 function restorePending(payload) {
-  for (const map of ["checked", "counts", "na"]) {
+  for (const map of ["checked", "na"]) {
     if (!payload[map]) continue;
     for (const [id, v] of Object.entries(payload[map])) {
       if (!(id in pending[map])) pending[map][id] = v;
@@ -521,10 +475,8 @@ function renderTask(task) {
   const head = document.createElement("div");
   head.className = "task__head";
 
-  // A tickable row is a <label> so the whole thing is a hit target. A counter
-  // row is not — there is no checkbox to toggle, and wrapping the counter in a
-  // label would make every + tap also activate the label.
-  const row = document.createElement(task.kind === "count" ? "div" : "label");
+  // The row is a <label> so the whole thing is a hit target for its checkbox.
+  const row = document.createElement("label");
   row.className = "task__row";
 
   const box = document.createElement("span");
@@ -536,40 +488,28 @@ function renderTask(task) {
   label.className = "task__label";
   label.textContent = task.label;
 
-  if (task.kind === "check") {
-    const input = document.createElement("input");
-    input.type = "checkbox";
-    input.checked = !!state.checked[task.id];
-    input.disabled = inputsDisabled() || na;
-    input.addEventListener("change", () => {
-      state.checked[task.id] = input.checked;
-      li.classList.toggle("task--done", isDone(task));
-      renderProgress();
-      queueChecked(task.id, input.checked);
-    });
-    row.append(input);
-  }
-  row.append(box, label);
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = !!state.checked[task.id];
+  input.disabled = inputsDisabled() || na;
+  input.addEventListener("change", () => {
+    state.checked[task.id] = input.checked;
+    li.classList.toggle("task--done", isDone(task));
+    renderProgress();
+    queueChecked(task.id, input.checked);
+  });
+  row.append(input, box, label);
   head.append(row);
 
   /* The head goes into the row NOW, before anything below adds to it. The note
-     panel and the rollover line are children of the <li>, not of the head, and
-     they must come after it — so the head has to be appended first and then
-     mutated in place, rather than assembled and appended last. */
+     panel is a child of the <li>, not of the head, and must come after it — so
+     the head has to be appended first and then mutated in place, rather than
+     assembled and appended last. */
   li.append(head);
 
   const tools = document.createElement("div");
   tools.className = "task__tools";
   head.append(tools);
-
-  /* The rollover only ever explains itself on the row it actually changed, and
-     only while it is in force. */
-  if (task.id === ROLLOVER.raises && state.na[ROLLOVER.when]) {
-    const sub = document.createElement("p");
-    sub.className = "task__sub";
-    sub.textContent = ROLLOVER.note;
-    li.append(sub);
-  }
 
   // One chip or several — a lone object is treated as a list of one so the
   // common single-link case stays a plain object in the config.
@@ -583,69 +523,10 @@ function renderTask(task) {
     tools.append(a);
   }
 
-  if (task.kind === "count") tools.append(renderCounter(task, li));
   if (task.notes) tools.append(renderNoteButton(task, li));
   tools.append(renderNaButton(task));
 
   return li;
-}
-
-/* A number, not a tick: the point is to log what was actually done, so the
-   value is stored as typed and is free to go past the target. Target only
-   decides when the row reads as done. */
-function renderCounter(task, li) {
-  const target = targetFor(task);
-  const wrap = document.createElement("div");
-  wrap.className = "counter";
-  wrap.setAttribute("role", "group");
-  wrap.setAttribute("aria-label", `${task.label} — count out of ${target}`);
-
-  const dec = chip("counter__btn", "−");
-  dec.setAttribute("aria-label", `One fewer on ${task.label}`);
-  const inc = chip("counter__btn", "+");
-  inc.setAttribute("aria-label", `One more on ${task.label}`);
-
-  // text + inputmode rather than type=number: the numeric keypad without the
-  // spinner arrows, which would sit right beside our own + and −.
-  const input = document.createElement("input");
-  input.className = "counter__input";
-  input.type = "text";
-  input.inputMode = "numeric";
-  input.autocomplete = "off";
-  input.value = String(countOf(task.id));
-  input.setAttribute("aria-label", `${task.label} count`);
-
-  const of = document.createElement("span");
-  of.className = "counter__target";
-  of.textContent = `/ ${target}`;
-
-  const disabled = inputsDisabled() || !!state.na[task.id];
-  dec.disabled = disabled;
-  inc.disabled = disabled;
-  input.disabled = disabled;
-
-  /* Applied in place rather than through renderAll(): a re-render would
-     rebuild the input mid-edit and take the caret with it. */
-  const apply = (n, writeBack) => {
-    const v = Math.max(0, Math.min(MAX_COUNT, Math.round(n) || 0));
-    state.counts[task.id] = v;
-    if (writeBack) input.value = String(v);
-    li.classList.toggle("task--done", isDone(task));
-    renderProgress();
-    queueCount(task.id, v);
-  };
-
-  dec.addEventListener("click", () => apply(countOf(task.id) - 1, true));
-  inc.addEventListener("click", () => apply(countOf(task.id) + 1, true));
-  input.addEventListener("input", () => {
-    // Strip as you type, but do not write the value back into the field mid-edit
-    // — that would fight the caret. The blur below normalises it.
-    apply(parseInt(input.value.replace(/[^0-9]/g, ""), 10) || 0, false);
-  });
-  input.addEventListener("blur", () => { input.value = String(countOf(task.id)); });
-
-  wrap.append(dec, input, of, inc);
-  return wrap;
 }
 
 /* Builds both halves of the note affordance and returns only the button: the
@@ -721,10 +602,9 @@ function renderNaButton(task) {
     const next = !state.na[task.id];
     state.na[task.id] = next;
     queueNa(task.id, next);
-    /* A full re-render, not a class toggle: N/A on one row can change another
-       row's target (the rollover), which changes its label, its done state and
-       the denominator. Cheap, and there is no caret to lose — the press has
-       already moved focus off any field. */
+    /* A full re-render, not a class toggle: the row's tick has to be disabled
+       and the denominator recomputed. Cheap, and there is no caret to lose —
+       the press has already moved focus off any field. */
     renderAll();
   });
   return btn;
@@ -833,29 +713,17 @@ function tallyRecent(days) {
   const byDate = Object.fromEntries(days.map((d) => [d.date, d]));
   const rows = [];
   for (const task of ALL_TASKS) {
-    let occasions = 0, naCount = 0, countSum = 0, countDays = 0;
+    let occasions = 0, naCount = 0;
     for (let i = 0; i < RECENT_DAYS; i++) {
       const iso = dateStr(i);
       const rec = byDate[iso];
       if (!rec) continue; // app never opened that day — not a skip, just no data
       if (!tasksFor(iso).some((t) => t.id === task.id)) continue; // not on the list
       occasions++;
-      if (rec.na && rec.na[task.id]) {
-        naCount++;
-        continue; // an N/A day has no count to average
-      }
-      if (task.kind === "count") {
-        countSum += Number((rec.counts || {})[task.id]) || 0;
-        countDays++;
-      }
+      if (rec.na && rec.na[task.id]) naCount++;
     }
     if (!occasions) continue;
-    rows.push({
-      task,
-      occasions,
-      naCount,
-      avg: countDays ? countSum / countDays : null,
-    });
+    rows.push({ task, occasions, naCount });
   }
   return rows;
 }
@@ -888,11 +756,7 @@ async function loadRecent() {
 
       const meta = document.createElement("span");
       meta.className = "tally__meta";
-      const bits = [`N/A ${row.naCount} of ${row.occasions}`];
-      if (row.avg !== null) {
-        bits.push(`avg ${row.avg.toFixed(1)} / ${row.task.target}`);
-      }
-      meta.textContent = bits.join(" · ");
+      meta.textContent = `N/A ${row.naCount} of ${row.occasions}`;
 
       li.append(name, meta);
       list.append(li);
@@ -909,7 +773,7 @@ async function submitDay() {
   btn.disabled = true;
   btn.textContent = "Submitting…";
   try {
-    await pushState(); // flush any pending tick/count/note changes first
+    await pushState(); // flush any pending tick/note changes first
     await saveNotes(); // capture today's check-in notes in the log
     await api("submit", {
       method: "POST",
@@ -938,7 +802,6 @@ async function load() {
       ...state,
       ...day,
       checked: { ...(day.checked || {}) },
-      counts: { ...(day.counts || {}) },
       na: { ...(day.na || {}) },
     };
     loaded = true;
@@ -958,7 +821,7 @@ async function load() {
    yesterday can survive into today's record even if the load then fails. */
 function startNewDay() {
   state = emptyState();
-  pending = { checked: {}, counts: {}, na: {} };
+  pending = { checked: {}, na: {} };
   notesOpen = {};
   recentLoaded = false;
   load();

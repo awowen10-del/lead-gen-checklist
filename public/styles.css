@@ -255,7 +255,7 @@ body {
 .task--na .task__box { border-color: var(--line); background: transparent; }
 
 /* head is the top part of the row; the note panel sits under it. It wraps: a
-   counter row on a phone carries links, a counter and N/A, which will not fit
+   row on a phone can carry two links, a note button and N/A, which will not fit
    beside the label, and squeezing the label to fit is worse than a second line. */
 .task__head {
   display: flex;
@@ -363,62 +363,6 @@ body {
 }
 .task__note-btn:disabled { opacity: 0.55; cursor: default; }
 
-/* ---------- Counter ----------
-   Reads "7 / 15" with a tap target either side. The value is free to go past
-   the target, so nothing here clamps or recolours at the top end — the row's
-   done state is the only thing that changes. */
-.counter {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid var(--line);
-  background: var(--navy-2);
-  border-radius: 9px;
-  padding: 2px 4px;
-}
-.counter__btn {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--orange);
-  font: inherit;
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1;
-  cursor: pointer;
-}
-.counter__btn:hover:not(:disabled) { background: var(--card); }
-.counter__btn:disabled { opacity: 0.4; cursor: default; }
-.counter__input {
-  width: 2.6ch;
-  min-width: 2.6ch;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-}
-.counter__input:disabled { opacity: 0.6; }
-.counter__target {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
-  padding-right: 2px;
-}
-.task--done .counter { border-color: rgba(var(--green-rgb), .45); }
-.task--done .counter__input { color: var(--tint-green); }
-
 /* ---------- N/A ----------
    Same chip geometry as the note button. Disabled is a real state here, not an
    accident: on the two outreach rows the button exists to say the answer is no. */
@@ -446,15 +390,6 @@ body {
   color: var(--ink-dim);
 }
 .na-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* the rollover explanation, under the row whose target it changed */
-.task__sub {
-  margin: 0;
-  padding: 0 var(--row-pad-x) 8px calc(var(--row-pad-x) + var(--box-size) + 10px);
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--orange);
-}
 
 .task__notes {
   padding: 0 var(--row-pad-x) 9px calc(var(--row-pad-x) + var(--box-size) + 10px);
@@ -652,7 +587,6 @@ body {
   .task__head { padding-right: 7px; }
   .task__row { padding-left: 9px; }
   .task__notes { padding-left: 9px; padding-right: 9px; }
-  .task__sub { padding-left: 9px; padding-right: 9px; }
   /* Once the tools have wrapped onto their own line, left-aligning them under
      the label reads better than stranding them against the right edge. */
   .task__tools { margin-left: 0; padding-left: 9px; }

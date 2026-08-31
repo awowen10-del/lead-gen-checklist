@@ -22,10 +22,11 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // every day and changing the schedule needs no server change and rewrites no
 // history.
 const TASK_IDS = ["ads", "content", "texts", "clients", "leads", "onboarding", "dm", "email"];
-// The subset stored as a number rather than a tick. Their `checked` entry is
-// never written: whether the row is done is derived on the client from the
-// count against a target that can move (the N/A rollover), so storing a
-// snapshot of that judgement here would just be a second, staler answer.
+// The subset that was briefly stored as a number rather than a tick. Both rows
+// are plain ticks again, so nothing writes these any more — but the field is
+// retained on the same grounds as the dead note fields below: days already
+// stored carry a count, and keeping the id here keeps those values readable in
+// the record rather than making them invisible.
 const COUNT_IDS = ["leads", "dm"];
 const MAX_COUNT = 999;
 const MAX_RECENT_DAYS = 60;
